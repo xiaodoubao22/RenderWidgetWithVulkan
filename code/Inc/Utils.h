@@ -23,6 +23,8 @@ namespace setting {
 
     const VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 
+    const std::string dirSpvFiles = "../spvFiles/";
+
 }
 
 namespace consts {

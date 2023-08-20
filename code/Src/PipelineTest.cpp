@@ -16,8 +16,10 @@ namespace render {
         shaderModules = {};
 
         // 读取shader
-        auto vertShaderCode = utils::ReadFile("Shaders/vert.spv");
-        auto fragShaderCode = utils::ReadFile("Shaders/frag.spv");
+        //auto vertShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("vert.spv"));
+        //auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("frag.spv"));
+		auto vertShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("vert.spv"));
+		auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("frag.spv"));
 
         // 创建
         shaderModules.vertexShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), vertShaderCode);
