@@ -66,7 +66,7 @@ namespace render {
         VkCommandBuffer mCommandBuffer = VK_NULL_HANDLE;
 
         // sync objecs
-        VkSemaphore mImageAvailiableSemaphore = VK_NULL_HANDLE;
+        VkSemaphore mImageAvailableSemaphore = VK_NULL_HANDLE;
         VkSemaphore mRenderFinishedSemaphore = VK_NULL_HANDLE;
         VkFence mInFlightFence = VK_NULL_HANDLE;
 

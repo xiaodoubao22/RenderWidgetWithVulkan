@@ -15,6 +15,7 @@ namespace render {
         void Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, VkSurfaceKHR surface);
         void CleanUp();
 
+        VkSwapchainKHR GetSwapchain() { return mSwapChain; }
         VkFormat GetFormat() { return mSwapChainImageFormat; }
         std::vector<VkImageView> GetImageViews() { return mSwapChainImageViews; }
         VkExtent2D GetExtent() { return mWindowExtent; }

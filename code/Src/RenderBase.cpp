@@ -65,27 +65,28 @@ namespace render {
 
     void RenderBase::Update() {
         // 等待前一帧结束(等待队列中的命令执行完)，然后上锁，表示开始画了
-        vkWaitForFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT16_MAX);
+        vkWaitForFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
         vkResetFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence);
 
         // 获取图像
-        uint32_t imageIndex = mSwapchain->AcquireImage(mImageAvailiableSemaphore);
+        uint32_t imageIndex = mSwapchain->AcquireImage(mImageAvailableSemaphore);
 
         // 记录命令
         vkResetCommandBuffer(mCommandBuffer, 0);
         RecordCommandBuffer(mCommandBuffer, imageIndex);
 
         // 提交命令
-        std::vector<VkSemaphore> imageAvailiableSemaphore = { mImageAvailiableSemaphore };
-        std::vector <VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-        std::vector <VkSemaphore> renderFinishedSemaphore = { mRenderFinishedSemaphore };
+        std::vector<VkSemaphore> imageAvailiableSemaphore = { mImageAvailableSemaphore };
+        std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        std::vector<VkCommandBuffer> commandBuffers = { mCommandBuffer };
+        std::vector<VkSemaphore> renderFinishedSemaphore = { mRenderFinishedSemaphore };
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.waitSemaphoreCount = imageAvailiableSemaphore.size();
         submitInfo.pWaitSemaphores = imageAvailiableSemaphore.data();    // 指定要等待的信号量
         submitInfo.pWaitDstStageMask = waitStages.data();      // 指定等待的阶段（颜色附件可写入）
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &mCommandBuffer;
+        submitInfo.commandBufferCount = commandBuffers.size();
+        submitInfo.pCommandBuffers = commandBuffers.data();
         submitInfo.signalSemaphoreCount = renderFinishedSemaphore.size();
         submitInfo.pSignalSemaphores = renderFinishedSemaphore.data();    // 指定命令执行完触发mRenderFinishedSemaphore，意思是等我画完再返回交换链
         // 把命令提交到图形队列中，第三个参数指定命令执行完毕后触发mInFlightFence，告诉CPU当前帧画完可以画下一帧了（解锁）
@@ -214,7 +215,7 @@ namespace render {
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;		//（初始化解锁）
 
-        if (vkCreateSemaphore(mGraphicsDevice->GetDevice(), &semaphoreInfo, nullptr, &mImageAvailiableSemaphore) != VK_SUCCESS ||
+        if (vkCreateSemaphore(mGraphicsDevice->GetDevice(), &semaphoreInfo, nullptr, &mImageAvailableSemaphore) != VK_SUCCESS ||
             vkCreateSemaphore(mGraphicsDevice->GetDevice(), &semaphoreInfo, nullptr, &mRenderFinishedSemaphore) != VK_SUCCESS ||
             vkCreateFence(mGraphicsDevice->GetDevice(), &fenceInfo, nullptr, &mInFlightFence) != VK_SUCCESS) {
             throw std::runtime_error("failed to create semaphores!");
@@ -236,7 +237,7 @@ namespace render {
     }
 
     void RenderBase::CleanUpSyncObjects() {
-        vkDestroySemaphore(mGraphicsDevice->GetDevice(), mImageAvailiableSemaphore, nullptr);
+        vkDestroySemaphore(mGraphicsDevice->GetDevice(), mImageAvailableSemaphore, nullptr);
         vkDestroySemaphore(mGraphicsDevice->GetDevice(), mRenderFinishedSemaphore, nullptr);
         vkDestroyFence(mGraphicsDevice->GetDevice(), mInFlightFence, nullptr);
     }
