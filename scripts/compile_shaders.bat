@@ -4,6 +4,6 @@
 @set PATH=%glslc%;%PATH%
 
 @set ShaderDir=..\code\Shaders
-glslc %ShaderDir%\shader.vert -o ..\spvFiles\vert.spv
-glslc %ShaderDir%\shader.frag -o ..\spvFiles\frag.spv
+glslc %ShaderDir%\DrawTriangleTest.vert -o ..\spv_files\DrawTriangleTestVert.spv
+glslc %ShaderDir%\DrawTriangleTest.frag -o ..\spv_files\DrawTriangleTestFrag.spv
 pause

@@ -2,12 +2,19 @@
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
+#include "Mesh.h"
 
 #include <iostream>
 #include <stdexcept>
 #include <array>
 
 namespace render {
+    std::vector<Vertex> gVertices = {
+        {{0.3f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    };
+
     RenderBase::RenderBase(window::WindowTemplate& a) : mWindow(a)
     {
         mGraphicsDevice = new GraphicsDevice();
@@ -38,19 +45,20 @@ namespace render {
         CreateSyncObjects();
         mRenderPassTest->Init(mGraphicsDevice, mSwapchain);
         mPipelineTest->Init(mGraphicsDevice, mWindow.GetWindowExtent(), { mRenderPassTest->GetRenderPass(), 0});
+        mCommandBuffer = mGraphicsDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
         CreateFramebuffers();
-        mCommandBuffer = mGraphicsDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-        
+        CreateVertexBuffer();
     }
 
     void RenderBase::CleanUp() {
         vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
 
         // destroy render objects
-        mGraphicsDevice->FreeCommandBuffer(mCommandBuffer);
+        CleanUpVertexBuffer();
         CleanUpFramebuffers();
         CleanUpDepthResources();
+        mGraphicsDevice->FreeCommandBuffer(mCommandBuffer);
         mPipelineTest->CleanUp();
         mRenderPassTest->CleanUp();
         CleanUpSyncObjects();
@@ -182,6 +190,13 @@ namespace render {
         //	VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
     }
 
+    void RenderBase::CleanUpDepthResources() {
+        // 销毁深度缓冲
+        vkDestroyImageView(mGraphicsDevice->GetDevice(), mDepthImageView, nullptr);
+        vkDestroyImage(mGraphicsDevice->GetDevice(), mDepthImage, nullptr);
+        vkFreeMemory(mGraphicsDevice->GetDevice(), mDepthImageMemory, nullptr);
+    }
+
     void RenderBase::CreateFramebuffers() {
         // 对每一个imageView创建帧缓冲
         std::vector<VkImageView> swapChainImageViews = mSwapchain->GetImageViews();
@@ -207,6 +222,13 @@ namespace render {
         }
     }
 
+    void RenderBase::CleanUpFramebuffers() {
+        // 销毁frame buffer
+        for (auto framebuffer : mSwapchainFramebuffers) {
+            vkDestroyFramebuffer(mGraphicsDevice->GetDevice(), framebuffer, nullptr);
+        }
+    }
+
     void RenderBase::CreateSyncObjects() {
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -222,24 +244,47 @@ namespace render {
         }
     }
 
-    void RenderBase::CleanUpDepthResources() {
-        // 销毁深度缓冲
-        vkDestroyImageView(mGraphicsDevice->GetDevice(), mDepthImageView, nullptr);
-        vkDestroyImage(mGraphicsDevice->GetDevice(), mDepthImage, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), mDepthImageMemory, nullptr);
-    }
-
-    void RenderBase::CleanUpFramebuffers() {
-        // 销毁frame buffer
-        for (auto framebuffer : mSwapchainFramebuffers) {
-            vkDestroyFramebuffer(mGraphicsDevice->GetDevice(), framebuffer, nullptr);
-        }
-    }
-
     void RenderBase::CleanUpSyncObjects() {
         vkDestroySemaphore(mGraphicsDevice->GetDevice(), mImageAvailableSemaphore, nullptr);
         vkDestroySemaphore(mGraphicsDevice->GetDevice(), mRenderFinishedSemaphore, nullptr);
         vkDestroyFence(mGraphicsDevice->GetDevice(), mInFlightFence, nullptr);
+    }
+
+    void RenderBase::CreateVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(gVertices[0]) * gVertices.size();
+
+        // 创建临时缓冲
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        mGraphicsDevice->CreateBuffer(bufferSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,		// 用途：transfer src
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            stagingBuffer, stagingBufferMemory);
+
+        // 数据拷贝到临时缓冲
+        void* data;
+        vkMapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, gVertices.data(), (size_t)bufferSize);
+        vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
+
+        // 创建 mVertexBuffer
+        mGraphicsDevice->CreateBuffer(bufferSize,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,	// 用途：transfer src + 顶点缓冲
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            mVertexBuffer, mVertexBufferMemory);
+
+        // 复制 stagingBuffer -> mVertexBuffer
+        mGraphicsDevice->CopyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
+
+        // 清理临时缓冲
+        vkDestroyBuffer(mGraphicsDevice->GetDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, nullptr);
+    }
+
+    void RenderBase::CleanUpVertexBuffer() {
+        // 销毁顶点缓冲区及显存
+        vkDestroyBuffer(mGraphicsDevice->GetDevice(), mVertexBuffer, nullptr);
+        vkFreeMemory(mGraphicsDevice->GetDevice(), mVertexBufferMemory, nullptr);
     }
 
     void RenderBase::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
@@ -267,13 +312,22 @@ namespace render {
         renderPassInfo.pClearValues = clearValues.data();
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        // 绑定Pipeline
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineTest->GetPipeline());
 
-        //vkCmdDrawIndexed(commandBuffer, 3, 1, 0, 0, 0);
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+        // 绑定顶点缓冲
+        std::vector<VkBuffer> vertexBuffers = { mVertexBuffer };
+        std::vector<VkDeviceSize> offsets = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
 
+        //画图
+        //vkCmdDrawIndexed(commandBuffer, 3, 1, 0, 0, 0);
+        vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
+
+        // 结束Pass
         vkCmdEndRenderPass(commandBuffer);
 
+        // 写入完成
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }

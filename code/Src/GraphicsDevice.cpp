@@ -148,6 +148,89 @@ namespace render {
 		vkFreeCommandBuffers(mDevice, mCommandPoolOfGraphics, 1, &commandBuffer);
 	}
 
+	void GraphicsDevice::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+		VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+		// 创建缓冲区
+		VkBufferCreateInfo bufferInfo{};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = size; // 缓冲区大小
+		bufferInfo.usage = usage;	 // 缓冲区用途
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;		 // 指定独占模式，因为只有一个队列（图形队列）需要用它
+		bufferInfo.flags = 0;
+		if (vkCreateBuffer(mDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create vertex buffer");
+		}
+
+		// 该buffer对显存的要求
+		VkMemoryRequirements memRequirements;
+		vkGetBufferMemoryRequirements(mDevice, buffer, &memRequirements);
+
+		// 申请显存
+		VkMemoryAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;		// 显存大小
+		allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
+		if (vkAllocateMemory(mDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+			throw std::runtime_error("failed to allocate vertex buffer memory!");
+		}
+
+		// 显存绑定到缓冲区
+		vkBindBufferMemory(mDevice, buffer, bufferMemory, 0);
+	}
+
+	VkCommandBuffer GraphicsDevice::BeginSingleTimeCommands() {
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandPool = mCommandPoolOfGraphics;
+		allocInfo.commandBufferCount = 1;
+
+		// 申请一个命令缓冲
+		VkCommandBuffer commandBuffer;
+		vkAllocateCommandBuffers(mDevice, &allocInfo, &commandBuffer);
+
+		// 启动命令缓冲
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;	// 只提交一次
+		vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+		return commandBuffer;
+	}
+
+	void GraphicsDevice::EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
+		// 结束
+		vkEndCommandBuffer(commandBuffer);
+
+		// 提交
+		// 此处提交给了图形队列，因为图形队列肯定能用于传输
+		// TODO：尝试获取一个新的、支持传输的队列
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+		vkQueueSubmit(mGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(mGraphicsQueue);
+
+		// 回收命令缓冲
+		vkFreeCommandBuffers(mDevice, mCommandPoolOfGraphics, 1, &commandBuffer);
+	}
+
+	void GraphicsDevice::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+		// 申请并启动一个命令缓冲
+		VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+
+		// 写入复制命令
+		VkBufferCopy copyRegion{};
+		copyRegion.srcOffset = 0;
+		copyRegion.dstOffset = 0;
+		copyRegion.size = size;
+		vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+		// 提交命令缓冲
+		EndSingleTimeCommands(commandBuffer);
+	}
+
 	void GraphicsDevice::PickPhysicalDevices() {
 		// 获取所有物理设备
 		uint32_t deviceCount = 0;

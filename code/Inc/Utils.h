@@ -23,7 +23,7 @@ namespace setting {
 
     const VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 
-    const std::string dirSpvFiles = "../spvFiles/";
+    const std::string dirSpvFiles = "../spv_files/";
 
 }
 
@@ -38,6 +38,8 @@ namespace consts {
 
     const VkClearValue CLEAR_COLOR_NAVY_FLT = { 0.2f, 0.3f, 0.3f, 1.0f };
     const VkClearValue CLEAR_DEPTH_ONE_STENCIL_ZERO = { 1.0f, 0 };
+
+    const std::string MAIN_FUNC_NAME = "main";
 }
 
 namespace utils {

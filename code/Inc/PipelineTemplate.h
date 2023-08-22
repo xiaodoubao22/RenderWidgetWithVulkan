@@ -17,6 +17,8 @@ namespace render {
         VkRect2D scissor = {};
         VkPipelineViewportStateCreateInfo viewportState = {};
         std::vector<VkPipelineShaderStageCreateInfo> shaderStageInfo = {};
+        std::vector<VkVertexInputBindingDescription> vertexBindingDescriptions = {};
+        std::vector<VkVertexInputAttributeDescription> vertexAttributeDescriptions = {};
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
         VkPipelineRasterizationStateCreateInfo rasterizer = {};

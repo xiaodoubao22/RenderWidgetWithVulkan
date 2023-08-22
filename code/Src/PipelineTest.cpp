@@ -1,5 +1,6 @@
 #include "PipelineTest.h"
 #include "Utils.h"
+#include "Mesh.h"
 
 #include <stdexcept>
 
@@ -16,10 +17,8 @@ namespace render {
         shaderModules = {};
 
         // 读取shader
-        //auto vertShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("vert.spv"));
-        //auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("frag.spv"));
-		auto vertShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("vert.spv"));
-		auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("frag.spv"));
+		auto vertShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTriangleTestVert.spv"));
+		auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTriangleTestFrag.spv"));
 
         // 创建
         shaderModules.vertexShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), vertShaderCode);
@@ -47,15 +46,15 @@ namespace render {
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 		vertShaderStageInfo.module = shaderModules.vertexShader;	// 代码
-		vertShaderStageInfo.pName = "main";		// 入口点
+		vertShaderStageInfo.pName = consts::MAIN_FUNC_NAME.c_str();		// 入口点
 		vertShaderStageInfo.pSpecializationInfo = nullptr;	// 常量值，此处没有
 
 		VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
 		fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 		fragShaderStageInfo.module = shaderModules.fragmentShader;
-		fragShaderStageInfo.pName = "main";
-		vertShaderStageInfo.pSpecializationInfo = nullptr;	// 常量值，此处没有
+		fragShaderStageInfo.pName = consts::MAIN_FUNC_NAME.c_str();
+		fragShaderStageInfo.pSpecializationInfo = nullptr;	// 常量值，此处没有
 
 		// view port
 		configInfo.viewport.x = 0.0f;
@@ -78,11 +77,14 @@ namespace render {
 		configInfo.shaderStageInfo = { vertShaderStageInfo, fragShaderStageInfo };
 
 		// 顶点输入
+		configInfo.vertexBindingDescriptions = { Vertex::GetBindingDescription() };
+		configInfo.vertexAttributeDescriptions = Vertex::getAttributeDescriptions();
+
 		configInfo.vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		configInfo.vertexInputInfo.vertexBindingDescriptionCount = 0;
-		configInfo.vertexInputInfo.pVertexBindingDescriptions = nullptr;
-		configInfo.vertexInputInfo.vertexAttributeDescriptionCount = 0;
-		configInfo.vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+		configInfo.vertexInputInfo.vertexBindingDescriptionCount = configInfo.vertexBindingDescriptions.size();
+		configInfo.vertexInputInfo.pVertexBindingDescriptions = configInfo.vertexBindingDescriptions.data();
+		configInfo.vertexInputInfo.vertexAttributeDescriptionCount = configInfo.vertexAttributeDescriptions.size();
+		configInfo.vertexInputInfo.pVertexAttributeDescriptions = configInfo.vertexAttributeDescriptions.data();
 
 		// 图元
 		configInfo.inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

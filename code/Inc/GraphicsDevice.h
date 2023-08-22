@@ -42,6 +42,11 @@ namespace render {
         void CreateImage(VkImageCreateInfo* pImageInfo, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
         VkCommandBuffer CreateCommandBuffer(VkCommandBufferLevel level);
         void FreeCommandBuffer(VkCommandBuffer commandBuffer);
+        void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+            VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+        VkCommandBuffer BeginSingleTimeCommands();
+        void EndSingleTimeCommands(VkCommandBuffer commandBuffer);
+        void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
     private:
         void PickPhysicalDevices();

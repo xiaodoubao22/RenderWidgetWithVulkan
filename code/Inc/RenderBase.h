@@ -25,13 +25,19 @@ namespace render {
 
     private:
         void CreateInstance();
+
         void CreateDepthResources();
-        void CreateFramebuffers();
-        void CreateSyncObjects();
         void CleanUpDepthResources();
+
+        void CreateFramebuffers();
         void CleanUpFramebuffers();
+
+        void CreateSyncObjects();
         void CleanUpSyncObjects();
 
+        void CreateVertexBuffer();
+        void CleanUpVertexBuffer();
+        
         void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
         
 
@@ -70,6 +76,9 @@ namespace render {
         VkSemaphore mRenderFinishedSemaphore = VK_NULL_HANDLE;
         VkFence mInFlightFence = VK_NULL_HANDLE;
 
+        // vertex buffer
+        VkBuffer mVertexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory mVertexBufferMemory = VK_NULL_HANDLE;
     };
 }
 

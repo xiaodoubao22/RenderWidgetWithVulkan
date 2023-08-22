@@ -5,7 +5,7 @@ project(RenderWidgetWithVulkan)
 
 # [third_party]设置三方库包含路径
 set(THIRD_PARTY ${CMAKE_SOURCE_DIR}/../third_party)
-set(GLM_DIR ${THIRD_PARTY}/glm-master)
+set(GLM_DIR ${THIRD_PARTY}/glm)
 set(GLFW_DIR ${THIRD_PARTY}/glfw-3.3.8.bin.WIN64)
 set(STB_DIR ${THIRD_PARTY}/stb)
 find_package(Vulkan REQUIRED)
