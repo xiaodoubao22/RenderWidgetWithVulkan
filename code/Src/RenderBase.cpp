@@ -4,6 +4,7 @@
 #include "DebugUtils.h"
 #include "Mesh.h"
 
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <array>
@@ -55,12 +56,17 @@ namespace render {
         CreateFramebuffers();
         CreateVertexBuffer();
         CreateIndexBuffer();
+        CreateUniformBuffer();
+        CreateDescriptorPool();
+        CreateDescriptorSets();
     }
 
     void RenderBase::CleanUp() {
         vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
 
         // destroy render objects
+        CleanUpDescriptorPool();
+        CleanUpUniformBuffer();
         CleanUpIndexBuffer();
         CleanUpVertexBuffer();
         CleanUpFramebuffers();
@@ -82,6 +88,8 @@ namespace render {
         // 等待前一帧结束(等待队列中的命令执行完)，然后上锁，表示开始画了
         vkWaitForFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
         vkResetFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence);
+
+        UpdataUniformBuffer();
 
         // 获取图像
         uint32_t imageIndex = mSwapchain->AcquireImage(mImageAvailableSemaphore);
@@ -330,6 +338,71 @@ namespace render {
         vkFreeMemory(mGraphicsDevice->GetDevice(), mIndexBufferMemory, nullptr);
     }
 
+    void RenderBase::CreateUniformBuffer() {
+        VkDeviceSize bufferSize = sizeof(UboMvpMatrix);
+
+        mGraphicsDevice->CreateBuffer(bufferSize, 
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+            mUniformBuffer, mUniformBuffersMemory);
+
+        vkMapMemory(mGraphicsDevice->GetDevice(), mUniformBuffersMemory, 0, bufferSize, 0, &mUniformBuffersMapped);
+    }
+
+    void RenderBase::CleanUpUniformBuffer() {
+        vkDestroyBuffer(mGraphicsDevice->GetDevice(), mUniformBuffer, nullptr);
+        vkFreeMemory(mGraphicsDevice->GetDevice(), mUniformBuffersMemory, nullptr);
+    }
+
+    void RenderBase::CreateDescriptorPool() {
+        std::vector<VkDescriptorPoolSize> poolSizes = mPipelineTest->GetDescriptorSize();   // 池中各种类型的Descriptor个数
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = poolSizes.size();      
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = 1;   // 池中最大能申请descriptorSet的个数
+        if (vkCreateDescriptorPool(mGraphicsDevice->GetDevice(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+    }
+
+    void RenderBase::CleanUpDescriptorPool() {
+        vkDestroyDescriptorPool(mGraphicsDevice->GetDevice(), mDescriptorPool, nullptr);
+    }
+
+    void RenderBase::CreateDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts= mPipelineTest->GetDescriptorSetLayouts();
+
+        // 从池中申请descriptor set
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = mDescriptorPool;		// 从这个池中申请
+        allocInfo.descriptorSetCount = descriptorSetLayouts.size();	// MAX_FRAMES_IN_FLIGHT
+        allocInfo.pSetLayouts = descriptorSetLayouts.data();
+        if (vkAllocateDescriptorSets(mGraphicsDevice->GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        // 向descriptor set写入信息
+        std::vector<VkDescriptorBufferInfo> bufferInfos(2);
+        bufferInfos[0].buffer = mUniformBuffer;     // mvp矩阵的ubo
+        bufferInfos[0].offset = 0;
+        bufferInfos[0].range = sizeof(UboMvpMatrix);
+
+        std::vector<VkWriteDescriptorSet> descriptorWrites(1);
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = mDescriptorSet;
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].dstArrayElement = 0;		// descriptors can be arrays
+        descriptorWrites[0].descriptorCount = 1;	    // 想要更新多少个元素（从索引dstArrayElement开始）
+        descriptorWrites[0].pBufferInfo = &bufferInfos[0];			//  ->
+        descriptorWrites[0].pImageInfo = nullptr;					//  -> 三选一
+        descriptorWrites[0].pTexelBufferView = nullptr;				//  ->
+        vkUpdateDescriptorSets(mGraphicsDevice->GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+    }
+
     void RenderBase::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
         // 开始写入
         VkCommandBufferBeginInfo beginInfo{};
@@ -366,6 +439,12 @@ namespace render {
         // 绑定索引缓冲
         vkCmdBindIndexBuffer(commandBuffer, mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
+        // 绑定DescriptorSet
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, 
+            mPipelineTest->GetPipelineLayout(), 
+            0, 1, &mDescriptorSet, 
+            0, nullptr);
+
         //画图
         vkCmdDrawIndexed(commandBuffer, gIndices.size(), 1, 0, 0, 0);
         //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
@@ -377,6 +456,24 @@ namespace render {
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }
+    }
+
+    void RenderBase::UpdataUniformBuffer() {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UboMvpMatrix uboMvpMatrixs{};
+        uboMvpMatrixs.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+        uboMvpMatrixs.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+        float aspectRatio = (float)mSwapchain->GetExtent().width / (float)mSwapchain->GetExtent().height;
+        uboMvpMatrixs.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
+        uboMvpMatrixs.proj[1][1] *= -1;
+
+        memcpy(mUniformBuffersMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
     }
 
     void RenderBase::CheckValidationLayerSupport(bool enableValidationLayer) {

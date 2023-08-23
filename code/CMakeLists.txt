@@ -34,7 +34,7 @@ target_include_directories(${RENDER_WIDGET} PUBLIC
     )
 # [third_party]链接静态库
 target_link_libraries(${RENDER_WIDGET} 
-    ${THIRD_PARTY}/glfw-3.3.8.bin.WIN64/lib-vc2022/glfw3.lib
+    ${GLFW_DIR}/lib-vc2022/glfw3.lib
     Vulkan::Vulkan
     )
 # 设置VS工程目录

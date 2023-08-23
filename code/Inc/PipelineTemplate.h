@@ -44,18 +44,24 @@ namespace render {
         void CleanUp();
 
         VkPipeline GetPipeline() { return mGraphicsPipeline; }
+        std::vector<VkDescriptorSetLayout> GetDescriptorSetLayouts() { return mDescriptorSetLayouts; }
+        VkPipelineLayout GetPipelineLayout() { return mPipelineLayout; }
+
+        virtual std::vector<VkDescriptorPoolSize> GetDescriptorSize() { return {}; }
 
     protected:
         virtual void CreateShaderModules(ShaderModules& shaderModules) = 0;
-        virtual void CreatePipeLineLayout(VkPipelineLayout& pipelineLayout) = 0;
-        virtual void ConfigPipeLineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) = 0;
+        virtual void CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) = 0;
+        virtual void ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) = 0;
+        
         
         VkShaderModule CreateShaderModule(VkDevice device, const std::vector<char>& code);
         VkExtent2D GetWindowExtent() { return mWindowExtent; };
         GraphicsDevice* GetGraphicsDevice() { return mGraphicDevice; };
 
     private:
-        void CreatePipeLine(const PipeLineConfigInfo& configInfo, const RenderPassInfo& rednerPassInfo);
+        void CreatePipelineLayout();
+        void CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& rednerPassInfo);
         void DestroyShaderModules();
 
     private:
@@ -64,6 +70,8 @@ namespace render {
 
         ShaderModules mShaders = {};
         VkPipeline mGraphicsPipeline = VK_NULL_HANDLE;
+
+        std::vector<VkDescriptorSetLayout> mDescriptorSetLayouts = {};
         VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
     };
 }

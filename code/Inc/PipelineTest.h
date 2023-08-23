@@ -10,10 +10,12 @@ namespace render{
         PipelineTest();
         ~PipelineTest();
 
+        virtual std::vector<VkDescriptorPoolSize> PipelineTest::GetDescriptorSize() override;
+
     private:
         virtual void CreateShaderModules(ShaderModules& shaderModules) override;
-        virtual void CreatePipeLineLayout(VkPipelineLayout& pipelineLayout) override;
-        virtual void ConfigPipeLineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) override;
+        virtual void CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) override;
+        virtual void ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) override;
     };
 }
 

@@ -13,6 +13,14 @@ namespace render {
 
     }
 
+	std::vector<VkDescriptorPoolSize> PipelineTest::GetDescriptorSize() {
+		std::vector<VkDescriptorPoolSize> descriptorSize(1);
+		descriptorSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorSize[0].descriptorCount = 1;
+
+		return descriptorSize;
+	}
+
     void PipelineTest::CreateShaderModules(ShaderModules& shaderModules) {
         shaderModules = {};
 
@@ -26,21 +34,28 @@ namespace render {
         return;
     }
 
-    void PipelineTest::CreatePipeLineLayout(VkPipelineLayout& pipelineLayout) {
-		// layout
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 0;
-		pipelineLayoutInfo.pSetLayouts = nullptr;
-		pipelineLayoutInfo.pushConstantRangeCount = 0;
-		pipelineLayoutInfo.pPushConstantRanges = nullptr;
+	void PipelineTest::CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) {
+		descriptorSetLayouts = std::vector<VkDescriptorSetLayout>(1);
 
-		if (vkCreatePipelineLayout(GetGraphicsDevice()->GetDevice(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create pipline layout!");
+		// descriptor bindings
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(1);
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		layoutBindings[0].pImmutableSamplers = nullptr; // Optional
+
+		// descriptor layout
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = layoutBindings.size();
+		layoutInfo.pBindings = layoutBindings.data();
+		if (vkCreateDescriptorSetLayout(GetGraphicsDevice()->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create descriptor set layout!");
 		}
-    }
+	}
 
-    void PipelineTest::ConfigPipeLineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& configInfo) {
+    void PipelineTest::ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& configInfo) {
 		// shader stage
 		VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

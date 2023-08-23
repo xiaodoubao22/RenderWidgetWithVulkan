@@ -11,19 +11,23 @@ namespace render {
     }
 
     void PipelineTemplate::Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, const RenderPassInfo& renderPassInfo) {
+        // set externel objects
         mGraphicDevice = graphicsDevice;
         mWindowExtent = windowExtent;
 
         // shaders
         CreateShaderModules(mShaders);
 
+        // descriptor layouts
+        CreateDescriptorSetLayouts(mDescriptorSetLayouts);
+
         // pipeline layout
-        CreatePipeLineLayout(mPipelineLayout);
+        CreatePipelineLayout();
 
         // pipeline
         PipeLineConfigInfo configInfo{};
-        ConfigPipeLineInfo(mShaders, configInfo);
-        CreatePipeLine(configInfo, renderPassInfo);
+        ConfigPipelineInfo(mShaders, configInfo);
+        CreatePipeline(configInfo, renderPassInfo);
 
         // destroy shaders
         DestroyShaderModules();
@@ -31,7 +35,12 @@ namespace render {
 
     void PipelineTemplate::CleanUp() {
         vkDestroyPipeline(mGraphicDevice->GetDevice(), mGraphicsPipeline, nullptr);
+
         vkDestroyPipelineLayout(mGraphicDevice->GetDevice(), mPipelineLayout, nullptr);
+        
+        for (auto setLayout : mDescriptorSetLayouts) {
+            vkDestroyDescriptorSetLayout(mGraphicDevice->GetDevice(), setLayout, nullptr);
+        }
     }
 
     VkShaderModule PipelineTemplate::CreateShaderModule(VkDevice device, const std::vector<char>& code) {
@@ -47,7 +56,20 @@ namespace render {
         return shaderModule;
     }
 
-    void PipelineTemplate::CreatePipeLine(const PipeLineConfigInfo& configInfo, const RenderPassInfo& rednerPassInfo) {
+    void PipelineTemplate::CreatePipelineLayout() {
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = mDescriptorSetLayouts.size();
+        pipelineLayoutInfo.pSetLayouts = mDescriptorSetLayouts.data();
+        pipelineLayoutInfo.pushConstantRangeCount = 0;
+        pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+        if (vkCreatePipelineLayout(GetGraphicsDevice()->GetDevice(), &pipelineLayoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create pipline layout!");
+        }
+    }
+
+    void PipelineTemplate::CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& rednerPassInfo) {
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.stageCount = configInfo.shaderStageInfo.size();
