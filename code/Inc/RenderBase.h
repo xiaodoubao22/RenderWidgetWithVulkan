@@ -37,14 +37,15 @@ namespace render {
 
         void CreateVertexBuffer();
         void CleanUpVertexBuffer();
+
+        void CreateIndexBuffer();
+        void CleanUpIndexBuffer();
         
         void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
         
-
         // ----- tool functions -----
         void CheckValidationLayerSupport(bool enableValidationLayer);
         bool CheckExtensionSupport(const std::vector<const char*>& target);
-
 
     private:
         bool mEnableValidationLayer = false;
@@ -79,6 +80,11 @@ namespace render {
         // vertex buffer
         VkBuffer mVertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory mVertexBufferMemory = VK_NULL_HANDLE;
+
+        // index buffer
+        VkBuffer mIndexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory mIndexBufferMemory = VK_NULL_HANDLE;
+
     };
 }
 

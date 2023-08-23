@@ -77,8 +77,8 @@ namespace render {
 		configInfo.shaderStageInfo = { vertShaderStageInfo, fragShaderStageInfo };
 
 		// 顶点输入
-		configInfo.vertexBindingDescriptions = { Vertex::GetBindingDescription() };
-		configInfo.vertexAttributeDescriptions = Vertex::getAttributeDescriptions();
+		configInfo.vertexBindingDescriptions = { Vertex2D::GetBindingDescription() };
+		configInfo.vertexAttributeDescriptions = Vertex2D::getAttributeDescriptions();
 
 		configInfo.vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		configInfo.vertexInputInfo.vertexBindingDescriptionCount = configInfo.vertexBindingDescriptions.size();

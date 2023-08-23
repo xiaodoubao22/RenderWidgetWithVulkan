@@ -9,10 +9,15 @@
 #include <array>
 
 namespace render {
-    std::vector<Vertex> gVertices = {
-        {{0.3f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    std::vector<Vertex2D> gVertices = {
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+    };
+
+    const std::vector<uint16_t> gIndices = {
+        0, 1, 2, 2, 3, 0
     };
 
     RenderBase::RenderBase(window::WindowTemplate& a) : mWindow(a)
@@ -49,12 +54,14 @@ namespace render {
         CreateDepthResources();
         CreateFramebuffers();
         CreateVertexBuffer();
+        CreateIndexBuffer();
     }
 
     void RenderBase::CleanUp() {
         vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
 
         // destroy render objects
+        CleanUpIndexBuffer();
         CleanUpVertexBuffer();
         CleanUpFramebuffers();
         CleanUpDepthResources();
@@ -287,6 +294,42 @@ namespace render {
         vkFreeMemory(mGraphicsDevice->GetDevice(), mVertexBufferMemory, nullptr);
     }
 
+    void RenderBase::CreateIndexBuffer() {
+        VkDeviceSize bufferSize = sizeof(gIndices[0]) * gIndices.size();
+
+        // 创建临时缓冲
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        mGraphicsDevice->CreateBuffer(bufferSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+            stagingBuffer, stagingBufferMemory);
+
+        // 数据拷贝到临时缓冲
+        void* data;
+        vkMapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, gIndices.data(), (size_t)bufferSize);
+        vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
+
+        // 创建索引缓冲
+        mGraphicsDevice->CreateBuffer(bufferSize, 
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+            mIndexBuffer, mIndexBufferMemory);
+
+        // 复制 stagingBuffer -> mIndexBuffer
+        mGraphicsDevice->CopyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
+
+        // 清理
+        vkDestroyBuffer(mGraphicsDevice->GetDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, nullptr);
+    }
+
+    void RenderBase::CleanUpIndexBuffer() {
+        vkDestroyBuffer(mGraphicsDevice->GetDevice(), mIndexBuffer, nullptr);
+        vkFreeMemory(mGraphicsDevice->GetDevice(), mIndexBufferMemory, nullptr);
+    }
+
     void RenderBase::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
         // 开始写入
         VkCommandBufferBeginInfo beginInfo{};
@@ -320,9 +363,12 @@ namespace render {
         std::vector<VkDeviceSize> offsets = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
 
+        // 绑定索引缓冲
+        vkCmdBindIndexBuffer(commandBuffer, mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
         //画图
-        //vkCmdDrawIndexed(commandBuffer, 3, 1, 0, 0, 0);
-        vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, gIndices.size(), 1, 0, 0, 0);
+        //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
 
         // 结束Pass
         vkCmdEndRenderPass(commandBuffer);
