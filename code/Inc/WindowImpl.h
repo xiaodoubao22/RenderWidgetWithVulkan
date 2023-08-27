@@ -15,10 +15,12 @@ namespace window {
         virtual void Initialize() override;
         virtual void Update() override;
         virtual void CleanUp() override;
-        virtual void OnFramebufferResized(GLFWwindow* window, int width, int height) override;
+        virtual void OnFramebufferResized(int width, int height) override;
 
     private:
         render::DrawTriangleThread* mDrawTriangleThread = nullptr;
+
+        bool mIsMinimized = false;
     };
 }
 

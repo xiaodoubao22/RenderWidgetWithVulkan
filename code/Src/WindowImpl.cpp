@@ -23,9 +23,21 @@ namespace window {
         mDrawTriangleThread->Stop();
     }
 
-    void WindowImpl::OnFramebufferResized(GLFWwindow* window, int width, int height) {
+    void WindowImpl::OnFramebufferResized(int width, int height) {
         mDrawTriangleThread->SetFramebufferResized();
 
+        if (width == 0 || height == 0) {
+            if (mIsMinimized == false) {
+                mDrawTriangleThread->Stop();
+            }
+            mIsMinimized = true;
+        }
+        else {
+            if (mIsMinimized == true) {
+                mDrawTriangleThread->Start();
+            }
+            mIsMinimized = false;
+        }
     }
 
 
