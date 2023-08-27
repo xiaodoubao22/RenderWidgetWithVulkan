@@ -122,7 +122,6 @@ namespace render {
                 Resize();
             }
         }
-
     }
 
     void DrawTriangleThread::OnThreadDestroy() {

@@ -16,10 +16,12 @@ namespace setting {
     // 独显/核显
     const VkPhysicalDeviceType defaultDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
-    const VkSurfaceFormatKHR surfaceFormat = {
+    const VkSurfaceFormatKHR swapchainSurfaceFormat = {
         VK_FORMAT_B8G8R8A8_SRGB,
         VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT
     };
+
+    const uint32_t swapchainImageCount = 2;
 
     const VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 

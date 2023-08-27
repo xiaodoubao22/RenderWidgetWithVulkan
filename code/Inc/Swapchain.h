@@ -29,7 +29,7 @@ namespace render {
         bool QueuePresent(uint32_t imageIndex, const std::vector<VkSemaphore>& waitSemaphores);
 
     private:
-        void CreateSwapChain(VkExtent2D windowExtent);
+        void CreateSwapChain(VkExtent2D windowExtent, VkSwapchainKHR oldSwapchain);
         void CreateImageViews();
         void DestroyImageViews();
 

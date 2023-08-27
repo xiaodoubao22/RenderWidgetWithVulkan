@@ -27,6 +27,11 @@ namespace render {
         void SetFramebufferResized();
 
     private:
+        virtual void OnThreadInit() override;
+        virtual void OnThreadLoop() override;
+        virtual void OnThreadDestroy() override;
+
+    private:
         // ----- rener functions -----
         void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
         void UpdataUniformBuffer();
@@ -60,11 +65,6 @@ namespace render {
         // ----- tool functions -----
         void CheckValidationLayerSupport(bool enableValidationLayer);
         bool CheckExtensionSupport(const std::vector<const char*>& target);
-
-    private:
-        virtual void OnThreadInit() override;
-        virtual void OnThreadLoop() override;
-        virtual void OnThreadDestroy() override;
 
     private:
         bool mEnableValidationLayer = false;

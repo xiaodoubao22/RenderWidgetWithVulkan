@@ -24,7 +24,7 @@ namespace render {
 		mSurface = surface;
 
 		// create
-		CreateSwapChain(windowExtent);
+		CreateSwapChain(windowExtent, VK_NULL_HANDLE);
 		CreateImageViews();
 
 		mIsInitialized = true;
@@ -53,12 +53,13 @@ namespace render {
 			return false;
 		}
 
-		// destroy
-		DestroyImageViews();
-		vkDestroySwapchainKHR(mGraphicsDevice->GetDevice(), mSwapChain, nullptr);
 
-		// create
-		CreateSwapChain(windowExtent);
+		DestroyImageViews();
+		
+		VkSwapchainKHR oldSwapchain = mSwapChain;
+		CreateSwapChain(windowExtent, oldSwapchain);
+		vkDestroySwapchainKHR(mGraphicsDevice->GetDevice(), oldSwapchain, nullptr);
+
 		CreateImageViews();
 
 		return true;
@@ -107,7 +108,7 @@ namespace render {
 		}
 	}
 
-    void Swapchain::CreateSwapChain(VkExtent2D windowExtent) {
+    void Swapchain::CreateSwapChain(VkExtent2D windowExtent, VkSwapchainKHR oldSwapchain) {
 		// 获取物理设备支持的交换链配置信息
 		SwapChainSupportdetails swapChainSupport = mGraphicsDevice->QuerySwapChainSupport();
 
@@ -118,7 +119,10 @@ namespace render {
 		// 显示范围 present extent
 		VkExtent2D swapchainExtent = ChooseSwapExtent(windowExtent, swapChainSupport.capabilities);
 		// 交换链中图像个数
-		uint32_t imageCount = std::clamp<uint32_t>(2, swapChainSupport.capabilities.minImageCount, swapChainSupport.capabilities.maxImageCount);
+		uint32_t imageCount = std::clamp<uint32_t>(
+			setting::swapchainImageCount,
+			swapChainSupport.capabilities.minImageCount, 
+			swapChainSupport.capabilities.maxImageCount);
 		// 模式
 		QueueFamilyIndices indices = mGraphicsDevice->GetQueueFamilies();
 		std::vector<uint32_t> indicesList(0);
@@ -141,7 +145,7 @@ namespace render {
 		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;	// alpha通道是否与其他窗口混合：否
 		createInfo.presentMode = presentMode;
 		createInfo.clipped = VK_TRUE;		// 不关心被（其他窗口）遮挡像素的颜色
-		createInfo.oldSwapchain = VK_NULL_HANDLE;
+		createInfo.oldSwapchain = oldSwapchain;
 		if (vkCreateSwapchainKHR(mGraphicsDevice->GetDevice(), &createInfo, nullptr, &mSwapChain) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create swap chain!");
 		}
@@ -190,8 +194,8 @@ namespace render {
 		// 选择合适的surface格式
 		for (const auto& availableFormat : availableFormats) {
 			// 格式 + 颜色空间
-			if (availableFormat.format == setting::surfaceFormat.format &&
-				availableFormat.colorSpace == setting::surfaceFormat.colorSpace) {
+			if (availableFormat.format == setting::swapchainSurfaceFormat.format &&
+				availableFormat.colorSpace == setting::swapchainSurfaceFormat.colorSpace) {
 				return availableFormat;
 			}
 		}

@@ -17,6 +17,7 @@ namespace window {
     }
 
     void WindowImpl::Update() {
+
     }
 
     void WindowImpl::CleanUp() {
@@ -28,13 +29,13 @@ namespace window {
 
         if (width == 0 || height == 0) {
             if (mIsMinimized == false) {
-                mDrawTriangleThread->Stop();
+                mDrawTriangleThread->Stop();    // 最小化时停止渲染线程
             }
             mIsMinimized = true;
         }
         else {
             if (mIsMinimized == true) {
-                mDrawTriangleThread->Start();
+                mDrawTriangleThread->Start();   // 恢复时打开渲染线程
             }
             mIsMinimized = false;
         }
