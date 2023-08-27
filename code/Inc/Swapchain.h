@@ -6,25 +6,30 @@
 
 #include "GraphicsDevice.h"
 
+namespace window {
+    class WindowTemplate;
+}
+
 namespace render {
     class Swapchain {
     public:
         Swapchain();
         ~Swapchain();
 
-        void Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, VkSurfaceKHR surface);
-        void CleanUp();
+        bool Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, VkSurfaceKHR surface);
+        bool CleanUp();
+        bool Recreate(VkExtent2D windowExtent);
 
         VkSwapchainKHR GetSwapchain() { return mSwapChain; }
-        VkFormat GetFormat() { return mSwapChainImageFormat; }
-        std::vector<VkImageView> GetImageViews() { return mSwapChainImageViews; }
-        VkExtent2D GetExtent() { return mWindowExtent; }
+        VkFormat GetFormat() { return mSwapchainImageFormat; }
+        std::vector<VkImageView> GetImageViews() { return mSwapchainImageViews; }
+        VkExtent2D GetExtent() { return mSwapchainExtent; }
 
-        uint32_t AcquireImage(VkSemaphore imageAvailiableSemaphore);
-        VkResult QueuePresent(uint32_t imageIndex, const std::vector<VkSemaphore>& waitSemaphores);
+        bool AcquireImage(VkSemaphore imageAvailiableSemaphore, uint32_t& imageIndex);
+        bool QueuePresent(uint32_t imageIndex, const std::vector<VkSemaphore>& waitSemaphores);
 
     private:
-        void CreateSwapChain();
+        void CreateSwapChain(VkExtent2D windowExtent);
         void CreateImageViews();
         void DestroyImageViews();
 
@@ -34,19 +39,24 @@ namespace render {
         VkSharingMode ChooseSharingMode(const QueueFamilyIndices& indices, std::vector<uint32_t>& indicesList);
 
     private:
+        bool mIsInitialized = false;
+
         // external objects
-        GraphicsDevice* mGraphicsDevice;
-        VkExtent2D mWindowExtent = {};
+        GraphicsDevice* mGraphicsDevice = nullptr;
         VkSurfaceKHR mSurface = VK_NULL_HANDLE;
+
+        // infos
+        VkFormat mSwapchainImageFormat = {};
+        VkPresentModeKHR mPresentMode = {};
+        VkExtent2D mSwapchainExtent = {};
+        uint32_t mImageCount = 0;
 
         // swapchain
         VkSwapchainKHR mSwapChain = VK_NULL_HANDLE;
-        VkFormat mSwapChainImageFormat = {};
-        VkExtent2D mSwapChainExtent = {};
 
         // images
-        std::vector<VkImage> mSwapChainImages = {};
-        std::vector<VkImageView> mSwapChainImageViews = {};
+        std::vector<VkImage> mSwapchainImages = {};
+        std::vector<VkImageView> mSwapchainImageViews = {};
     };
 }
 

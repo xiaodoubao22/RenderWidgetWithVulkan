@@ -8,17 +8,17 @@ namespace window {
     class WindowImpl : public WindowTemplate
     {
     public:
-        WindowImpl();
+        WindowImpl(bool resizable);
         ~WindowImpl();
 
     private:
         virtual void Initialize() override;
         virtual void Update() override;
         virtual void CleanUp() override;
+        virtual void OnFramebufferResize(GLFWwindow* window, int width, int height) override;
 
     private:
         render::RenderBase* mRenderer = nullptr;
-
     };
 }
 

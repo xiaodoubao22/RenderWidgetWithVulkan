@@ -13,7 +13,7 @@ namespace render {
 
     }
 
-	std::vector<VkDescriptorPoolSize> PipelineTest::GetDescriptorSize() {
+	std::vector<VkDescriptorPoolSize> PipelineTest::GetDescriptorSize() {	
 		std::vector<VkDescriptorPoolSize> descriptorSize(1);
 		descriptorSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		descriptorSize[0].descriptorCount = 1;
@@ -169,8 +169,8 @@ namespace render {
 			VK_DYNAMIC_STATE_LINE_WIDTH
 		};
 		configInfo.dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		configInfo.dynamicStateCreateInfo.dynamicStateCount = 0; // static_cast<uint32_t>(configInfo.dynamicStates.size());
-		configInfo.dynamicStateCreateInfo.pDynamicStates = nullptr; //configInfo.dynamicStates.data();
+		configInfo.dynamicStateCreateInfo.dynamicStateCount = configInfo.dynamicStates.size();
+		configInfo.dynamicStateCreateInfo.pDynamicStates = configInfo.dynamicStates.data();
 		return;
     }
 }

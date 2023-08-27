@@ -2,7 +2,7 @@
 #include "WindowImpl.h"
 
 int main() {
-    window::WindowImpl a;
+    window::WindowImpl a(true);
     try {
         a.Exec();
     }

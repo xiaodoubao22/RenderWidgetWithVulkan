@@ -33,7 +33,14 @@ namespace render {
         void CleanUp();
         void Update();
 
+        void SetFramebufferResized() { mFramebufferResized = true; }
+
     private:
+        // ----- rener functions -----
+        void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
+        void UpdataUniformBuffer();
+        void Resize();
+
         // ----- create and clean up ----- 
         void CreateInstance();
 
@@ -59,17 +66,13 @@ namespace render {
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
         
-        
-        // ----- rener functions -----
-        void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
-        void UpdataUniformBuffer();
-        
         // ----- tool functions -----
         void CheckValidationLayerSupport(bool enableValidationLayer);
         bool CheckExtensionSupport(const std::vector<const char*>& target);
 
     private:
         bool mEnableValidationLayer = false;
+        bool mFramebufferResized = false;
 
         // ---- externel objects ----
         window::WindowTemplate& mWindow;

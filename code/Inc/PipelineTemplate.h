@@ -47,7 +47,7 @@ namespace render {
         std::vector<VkDescriptorSetLayout> GetDescriptorSetLayouts() { return mDescriptorSetLayouts; }
         VkPipelineLayout GetPipelineLayout() { return mPipelineLayout; }
 
-        virtual std::vector<VkDescriptorPoolSize> GetDescriptorSize() { return {}; }
+        virtual std::vector<VkDescriptorPoolSize> GetDescriptorSize() { return {}; }    // 各种类型的descriptor分别需要多少个
 
     protected:
         virtual void CreateShaderModules(ShaderModules& shaderModules) = 0;

@@ -89,10 +89,14 @@ namespace render {
         vkWaitForFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
         vkResetFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence);
 
-        UpdataUniformBuffer();
-
         // 获取图像
-        uint32_t imageIndex = mSwapchain->AcquireImage(mImageAvailableSemaphore);
+        uint32_t imageIndex;
+        if (!mSwapchain->AcquireImage(mImageAvailableSemaphore, imageIndex)) {
+            Resize();
+        }
+
+        // 更新uniform
+        UpdataUniformBuffer();
 
         // 记录命令
         vkResetCommandBuffer(mCommandBuffer, 0);
@@ -118,7 +122,107 @@ namespace render {
         }
 
         // 提交显示
-        mSwapchain->QueuePresent(imageIndex, renderFinishedSemaphore);
+        if (!mSwapchain->QueuePresent(imageIndex, renderFinishedSemaphore) || mFramebufferResized) {
+            mFramebufferResized = false;
+            Resize();
+        }
+    }
+
+    void RenderBase::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
+        // 开始写入
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0;
+        beginInfo.pInheritanceInfo = nullptr;
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("fiaile to begin recording command buffer!");
+        }
+
+        // 启动Pass
+        std::array<VkClearValue, 2> clearValues = {
+            consts::CLEAR_COLOR_NAVY_FLT,
+            consts::CLEAR_DEPTH_ONE_STENCIL_ZERO
+        };
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = mRenderPassTest->GetRenderPass();
+        renderPassInfo.framebuffer = mSwapchainFramebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = mSwapchain->GetExtent();
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        // 绑定Pipeline
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineTest->GetPipeline());
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)mSwapchain->GetExtent().width;
+        viewport.height = (float)mSwapchain->GetExtent().height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = mSwapchain->GetExtent();
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        // 绑定顶点缓冲
+        std::vector<VkBuffer> vertexBuffers = { mVertexBuffer };
+        std::vector<VkDeviceSize> offsets = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
+
+        // 绑定索引缓冲
+        vkCmdBindIndexBuffer(commandBuffer, mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+        // 绑定DescriptorSet
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            mPipelineTest->GetPipelineLayout(),
+            0, 1, &mDescriptorSet,
+            0, nullptr);
+
+        //画图
+        vkCmdDrawIndexed(commandBuffer, gIndices.size(), 1, 0, 0, 0);
+        //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
+
+        // 结束Pass
+        vkCmdEndRenderPass(commandBuffer);
+
+        // 写入完成
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to record command buffer!");
+        }
+    }
+
+    void RenderBase::UpdataUniformBuffer() {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UboMvpMatrix uboMvpMatrixs{};
+        uboMvpMatrixs.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+        uboMvpMatrixs.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+        float aspectRatio = (float)mSwapchain->GetExtent().width / (float)mSwapchain->GetExtent().height;
+        uboMvpMatrixs.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
+        uboMvpMatrixs.proj[1][1] *= -1;
+
+        memcpy(mUniformBuffersMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
+    }
+
+    void RenderBase::Resize() {
+        std::cout << "recreate" << mWindow.GetWindowExtent().width << " " << mWindow.GetWindowExtent().height << std::endl;
+        vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
+
+        CleanUpFramebuffers();
+        CleanUpDepthResources();
+
+        mSwapchain->Recreate(mWindow.GetWindowExtent());
+        CreateDepthResources();
+        CreateFramebuffers();
     }
 
     void RenderBase::CreateInstance() {
@@ -378,7 +482,7 @@ namespace render {
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = mDescriptorPool;		// 从这个池中申请
-        allocInfo.descriptorSetCount = descriptorSetLayouts.size();	// MAX_FRAMES_IN_FLIGHT
+        allocInfo.descriptorSetCount = descriptorSetLayouts.size();
         allocInfo.pSetLayouts = descriptorSetLayouts.data();
         if (vkAllocateDescriptorSets(mGraphicsDevice->GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
@@ -401,79 +505,6 @@ namespace render {
         descriptorWrites[0].pImageInfo = nullptr;					//  -> 三选一
         descriptorWrites[0].pTexelBufferView = nullptr;				//  ->
         vkUpdateDescriptorSets(mGraphicsDevice->GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
-    }
-
-    void RenderBase::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
-        // 开始写入
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = 0;
-        beginInfo.pInheritanceInfo = nullptr;
-        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-            throw std::runtime_error("fiaile to begin recording command buffer!");
-        }
-
-        // 启动Pass
-        std::array<VkClearValue, 2> clearValues = {
-            consts::CLEAR_COLOR_NAVY_FLT,
-            consts::CLEAR_DEPTH_ONE_STENCIL_ZERO
-        };
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = mRenderPassTest->GetRenderPass();
-        renderPassInfo.framebuffer = mSwapchainFramebuffers[imageIndex];
-        renderPassInfo.renderArea.offset = { 0, 0 };
-        renderPassInfo.renderArea.extent = mSwapchain->GetExtent();
-        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-        renderPassInfo.pClearValues = clearValues.data();
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        // 绑定Pipeline
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineTest->GetPipeline());
-
-        // 绑定顶点缓冲
-        std::vector<VkBuffer> vertexBuffers = { mVertexBuffer };
-        std::vector<VkDeviceSize> offsets = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
-
-        // 绑定索引缓冲
-        vkCmdBindIndexBuffer(commandBuffer, mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
-
-        // 绑定DescriptorSet
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            mPipelineTest->GetPipelineLayout(), 
-            0, 1, &mDescriptorSet, 
-            0, nullptr);
-
-        //画图
-        vkCmdDrawIndexed(commandBuffer, gIndices.size(), 1, 0, 0, 0);
-        //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
-
-        // 结束Pass
-        vkCmdEndRenderPass(commandBuffer);
-
-        // 写入完成
-        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("failed to record command buffer!");
-        }
-    }
-
-    void RenderBase::UpdataUniformBuffer() {
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        UboMvpMatrix uboMvpMatrixs{};
-        uboMvpMatrixs.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-
-        uboMvpMatrixs.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-
-        float aspectRatio = (float)mSwapchain->GetExtent().width / (float)mSwapchain->GetExtent().height;
-        uboMvpMatrixs.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
-        uboMvpMatrixs.proj[1][1] *= -1;
-
-        memcpy(mUniformBuffersMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
     }
 
     void RenderBase::CheckValidationLayerSupport(bool enableValidationLayer) {

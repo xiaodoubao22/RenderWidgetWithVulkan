@@ -63,7 +63,6 @@ namespace render {
         pipelineLayoutInfo.pSetLayouts = mDescriptorSetLayouts.data();
         pipelineLayoutInfo.pushConstantRangeCount = 0;
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
-
         if (vkCreatePipelineLayout(GetGraphicsDevice()->GetDevice(), &pipelineLayoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipline layout!");
         }
@@ -87,7 +86,6 @@ namespace render {
         pipelineInfo.subpass = rednerPassInfo.subPassIndex;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;	// pipeline可以继承，减小创建管线的成本 .flags |= VK_PIPELINE_CREATE_DERIVARIVE_BIT
         pipelineInfo.basePipelineIndex = -1;
-
         if (vkCreateGraphicsPipelines(mGraphicDevice->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("failed to create graphics pipeline!");
         }

@@ -11,7 +11,7 @@
 namespace window {
     class WindowTemplate {
     public:
-        WindowTemplate();
+        explicit WindowTemplate(bool resizable);
         ~WindowTemplate();
 
         void Exec();
@@ -23,6 +23,13 @@ namespace window {
         virtual void Initialize() = 0;
         virtual void Update() = 0;
         virtual void CleanUp() = 0;
+        virtual void OnFramebufferResize(GLFWwindow* window, int width, int height) = 0;
+
+    private:
+        static void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
+            auto windowTemplate = reinterpret_cast<WindowTemplate*>(glfwGetWindowUserPointer(window));
+            windowTemplate->OnFramebufferResize(window, width, height);
+        }
 
     protected:
         GLFWwindow* mWindow = nullptr;
