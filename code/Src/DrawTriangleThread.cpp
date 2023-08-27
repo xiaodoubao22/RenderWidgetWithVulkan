@@ -1,4 +1,5 @@
-#include "RenderBase.h"
+#include "DrawTriangleThread.h"
+
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
@@ -10,6 +11,12 @@
 #include <array>
 
 namespace render {
+    struct UboMvpMatrix {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
+
     std::vector<Vertex2D> gVertices = {
         {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
         {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
@@ -21,7 +28,7 @@ namespace render {
         0, 1, 2, 2, 3, 0
     };
 
-    RenderBase::RenderBase(window::WindowTemplate& a) : mWindow(a)
+    DrawTriangleThread::DrawTriangleThread(window::WindowTemplate& a) : mWindow(a)
     {
         mGraphicsDevice = new GraphicsDevice();
         mSwapchain = new Swapchain();
@@ -29,16 +36,20 @@ namespace render {
         mPipelineTest = new PipelineTest();
     }
 
-    RenderBase::~RenderBase()
-    {
+    DrawTriangleThread::~DrawTriangleThread() {
         delete mPipelineTest;
         delete mRenderPassTest;
         delete mSwapchain;
         delete mGraphicsDevice;
     }
 
-    void RenderBase::Init(bool enableValidationLayer) {
-        CheckValidationLayerSupport(enableValidationLayer);
+    void DrawTriangleThread::SetFramebufferResized() {
+        std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
+        mFramebufferResized = true;
+    }
+
+    void DrawTriangleThread::OnThreadInit() {
+        CheckValidationLayerSupport(setting::enableValidationLayer);
 
         // create basic objects
         CreateInstance();
@@ -50,7 +61,7 @@ namespace render {
         // create render objects
         CreateSyncObjects();
         mRenderPassTest->Init(mGraphicsDevice, mSwapchain);
-        mPipelineTest->Init(mGraphicsDevice, mWindow.GetWindowExtent(), { mRenderPassTest->GetRenderPass(), 0});
+        mPipelineTest->Init(mGraphicsDevice, mWindow.GetWindowExtent(), { mRenderPassTest->GetRenderPass(), 0 });
         mCommandBuffer = mGraphicsDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
         CreateFramebuffers();
@@ -61,30 +72,7 @@ namespace render {
         CreateDescriptorSets();
     }
 
-    void RenderBase::CleanUp() {
-        vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
-
-        // destroy render objects
-        CleanUpDescriptorPool();
-        CleanUpUniformBuffer();
-        CleanUpIndexBuffer();
-        CleanUpVertexBuffer();
-        CleanUpFramebuffers();
-        CleanUpDepthResources();
-        mGraphicsDevice->FreeCommandBuffer(mCommandBuffer);
-        mPipelineTest->CleanUp();
-        mRenderPassTest->CleanUp();
-        CleanUpSyncObjects();
-
-        // destroy basic objects
-        mSwapchain->CleanUp();
-        mGraphicsDevice->CleanUp();
-        vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
-        DebugUtils::GetInstance().Destroy(mInstance);
-        vkDestroyInstance(mInstance, nullptr);
-    }
-
-    void RenderBase::Update() {
+    void DrawTriangleThread::OnThreadLoop() {
         // 等待前一帧结束(等待队列中的命令执行完)，然后上锁，表示开始画了
         vkWaitForFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
         vkResetFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence);
@@ -122,13 +110,45 @@ namespace render {
         }
 
         // 提交显示
-        if (!mSwapchain->QueuePresent(imageIndex, renderFinishedSemaphore) || mFramebufferResized) {
-            mFramebufferResized = false;
+        if (!mSwapchain->QueuePresent(imageIndex, renderFinishedSemaphore)) {
             Resize();
         }
+
+        // 主动重建交换链
+        {
+            std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
+            if (mFramebufferResized) {
+                mFramebufferResized = false;
+                Resize();
+            }
+        }
+
     }
 
-    void RenderBase::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
+    void DrawTriangleThread::OnThreadDestroy() {
+        vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
+
+        // destroy render objects
+        CleanUpDescriptorPool();
+        CleanUpUniformBuffer();
+        CleanUpIndexBuffer();
+        CleanUpVertexBuffer();
+        CleanUpFramebuffers();
+        CleanUpDepthResources();
+        mGraphicsDevice->FreeCommandBuffer(mCommandBuffer);
+        mPipelineTest->CleanUp();
+        mRenderPassTest->CleanUp();
+        CleanUpSyncObjects();
+
+        // destroy basic objects
+        mSwapchain->CleanUp();
+        mGraphicsDevice->CleanUp();
+        vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
+        DebugUtils::GetInstance().Destroy(mInstance);
+        vkDestroyInstance(mInstance, nullptr);
+    }
+
+    void DrawTriangleThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
         // 开始写入
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -195,7 +215,7 @@ namespace render {
         }
     }
 
-    void RenderBase::UpdataUniformBuffer() {
+    void DrawTriangleThread::UpdataUniformBuffer() {
         static auto startTime = std::chrono::high_resolution_clock::now();
 
         auto currentTime = std::chrono::high_resolution_clock::now();
@@ -213,8 +233,8 @@ namespace render {
         memcpy(mUniformBuffersMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
     }
 
-    void RenderBase::Resize() {
-        std::cout << "recreate" << mWindow.GetWindowExtent().width << " " << mWindow.GetWindowExtent().height << std::endl;
+    void DrawTriangleThread::Resize() {
+        //std::cout << "recreate" << mWindow.GetWindowExtent().width << " " << mWindow.GetWindowExtent().height << std::endl;
         vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
 
         CleanUpFramebuffers();
@@ -225,7 +245,7 @@ namespace render {
         CreateFramebuffers();
     }
 
-    void RenderBase::CreateInstance() {
+    void DrawTriangleThread::CreateInstance() {
         // 检查需要的拓展
         auto extensions = mWindow.QueryWindowRequiredExtensions();
         if (mEnableValidationLayer) {
@@ -269,7 +289,7 @@ namespace render {
         }
     }
 
-    void RenderBase::CreateDepthResources() {
+    void DrawTriangleThread::CreateDepthResources() {
         // image
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -309,14 +329,14 @@ namespace render {
         //	VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
     }
 
-    void RenderBase::CleanUpDepthResources() {
+    void DrawTriangleThread::CleanUpDepthResources() {
         // 销毁深度缓冲
         vkDestroyImageView(mGraphicsDevice->GetDevice(), mDepthImageView, nullptr);
         vkDestroyImage(mGraphicsDevice->GetDevice(), mDepthImage, nullptr);
         vkFreeMemory(mGraphicsDevice->GetDevice(), mDepthImageMemory, nullptr);
     }
 
-    void RenderBase::CreateFramebuffers() {
+    void DrawTriangleThread::CreateFramebuffers() {
         // 对每一个imageView创建帧缓冲
         std::vector<VkImageView> swapChainImageViews = mSwapchain->GetImageViews();
         mSwapchainFramebuffers.resize(swapChainImageViews.size());
@@ -341,14 +361,14 @@ namespace render {
         }
     }
 
-    void RenderBase::CleanUpFramebuffers() {
+    void DrawTriangleThread::CleanUpFramebuffers() {
         // 销毁frame buffer
         for (auto framebuffer : mSwapchainFramebuffers) {
             vkDestroyFramebuffer(mGraphicsDevice->GetDevice(), framebuffer, nullptr);
         }
     }
 
-    void RenderBase::CreateSyncObjects() {
+    void DrawTriangleThread::CreateSyncObjects() {
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -363,13 +383,13 @@ namespace render {
         }
     }
 
-    void RenderBase::CleanUpSyncObjects() {
+    void DrawTriangleThread::CleanUpSyncObjects() {
         vkDestroySemaphore(mGraphicsDevice->GetDevice(), mImageAvailableSemaphore, nullptr);
         vkDestroySemaphore(mGraphicsDevice->GetDevice(), mRenderFinishedSemaphore, nullptr);
         vkDestroyFence(mGraphicsDevice->GetDevice(), mInFlightFence, nullptr);
     }
 
-    void RenderBase::CreateVertexBuffer() {
+    void DrawTriangleThread::CreateVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(gVertices[0]) * gVertices.size();
 
         // 创建临时缓冲
@@ -400,21 +420,21 @@ namespace render {
         vkFreeMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, nullptr);
     }
 
-    void RenderBase::CleanUpVertexBuffer() {
+    void DrawTriangleThread::CleanUpVertexBuffer() {
         // 销毁顶点缓冲区及显存
         vkDestroyBuffer(mGraphicsDevice->GetDevice(), mVertexBuffer, nullptr);
         vkFreeMemory(mGraphicsDevice->GetDevice(), mVertexBufferMemory, nullptr);
     }
 
-    void RenderBase::CreateIndexBuffer() {
+    void DrawTriangleThread::CreateIndexBuffer() {
         VkDeviceSize bufferSize = sizeof(gIndices[0]) * gIndices.size();
 
         // 创建临时缓冲
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         mGraphicsDevice->CreateBuffer(bufferSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             stagingBuffer, stagingBufferMemory);
 
         // 数据拷贝到临时缓冲
@@ -424,9 +444,9 @@ namespace render {
         vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
 
         // 创建索引缓冲
-        mGraphicsDevice->CreateBuffer(bufferSize, 
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+        mGraphicsDevice->CreateBuffer(bufferSize,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             mIndexBuffer, mIndexBufferMemory);
 
         // 复制 stagingBuffer -> mIndexBuffer
@@ -437,33 +457,33 @@ namespace render {
         vkFreeMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, nullptr);
     }
 
-    void RenderBase::CleanUpIndexBuffer() {
+    void DrawTriangleThread::CleanUpIndexBuffer() {
         vkDestroyBuffer(mGraphicsDevice->GetDevice(), mIndexBuffer, nullptr);
         vkFreeMemory(mGraphicsDevice->GetDevice(), mIndexBufferMemory, nullptr);
     }
 
-    void RenderBase::CreateUniformBuffer() {
+    void DrawTriangleThread::CreateUniformBuffer() {
         VkDeviceSize bufferSize = sizeof(UboMvpMatrix);
 
-        mGraphicsDevice->CreateBuffer(bufferSize, 
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+        mGraphicsDevice->CreateBuffer(bufferSize,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             mUniformBuffer, mUniformBuffersMemory);
 
         vkMapMemory(mGraphicsDevice->GetDevice(), mUniformBuffersMemory, 0, bufferSize, 0, &mUniformBuffersMapped);
     }
 
-    void RenderBase::CleanUpUniformBuffer() {
+    void DrawTriangleThread::CleanUpUniformBuffer() {
         vkDestroyBuffer(mGraphicsDevice->GetDevice(), mUniformBuffer, nullptr);
         vkFreeMemory(mGraphicsDevice->GetDevice(), mUniformBuffersMemory, nullptr);
     }
 
-    void RenderBase::CreateDescriptorPool() {
+    void DrawTriangleThread::CreateDescriptorPool() {
         std::vector<VkDescriptorPoolSize> poolSizes = mPipelineTest->GetDescriptorSize();   // 池中各种类型的Descriptor个数
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = poolSizes.size();      
+        poolInfo.poolSizeCount = poolSizes.size();
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = 1;   // 池中最大能申请descriptorSet的个数
         if (vkCreateDescriptorPool(mGraphicsDevice->GetDevice(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
@@ -471,12 +491,12 @@ namespace render {
         }
     }
 
-    void RenderBase::CleanUpDescriptorPool() {
+    void DrawTriangleThread::CleanUpDescriptorPool() {
         vkDestroyDescriptorPool(mGraphicsDevice->GetDevice(), mDescriptorPool, nullptr);
     }
 
-    void RenderBase::CreateDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts= mPipelineTest->GetDescriptorSetLayouts();
+    void DrawTriangleThread::CreateDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPipelineTest->GetDescriptorSetLayouts();
 
         // 从池中申请descriptor set
         VkDescriptorSetAllocateInfo allocInfo{};
@@ -507,7 +527,7 @@ namespace render {
         vkUpdateDescriptorSets(mGraphicsDevice->GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
 
-    void RenderBase::CheckValidationLayerSupport(bool enableValidationLayer) {
+    void DrawTriangleThread::CheckValidationLayerSupport(bool enableValidationLayer) {
         if (enableValidationLayer == false) {
             std::cout << "validation layer disabled" << std::endl;
             mEnableValidationLayer = false;
@@ -539,7 +559,7 @@ namespace render {
         return;
     }
 
-    bool RenderBase::CheckExtensionSupport(const std::vector<const char*>& target) {
+    bool DrawTriangleThread::CheckExtensionSupport(const std::vector<const char*>& target) {
         // 获取支持的拓展
         uint32_t extensionCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);

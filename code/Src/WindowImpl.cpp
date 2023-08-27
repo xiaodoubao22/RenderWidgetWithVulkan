@@ -4,27 +4,28 @@
 namespace window {
     WindowImpl::WindowImpl(bool resizable) : WindowTemplate(resizable)
     {
-        mRenderer = new render::RenderBase(*this);
+        mDrawTriangleThread = new render::DrawTriangleThread(*this);
     }
 
     WindowImpl::~WindowImpl() {
-        delete mRenderer;
+        mDrawTriangleThread->Destroy();
+        delete mDrawTriangleThread;
     }
 
     void WindowImpl::Initialize() {
-        mRenderer->Init(setting::enableValidationLayer);
+        mDrawTriangleThread->Start();
     }
 
     void WindowImpl::Update() {
-        mRenderer->Update();
     }
 
     void WindowImpl::CleanUp() {
-        mRenderer->CleanUp();
+        mDrawTriangleThread->Stop();
     }
 
-    void WindowImpl::OnFramebufferResize(GLFWwindow* window, int width, int height) {
-        mRenderer->SetFramebufferResized();
+    void WindowImpl::OnFramebufferResized(GLFWwindow* window, int width, int height) {
+        mDrawTriangleThread->SetFramebufferResized();
+
     }
 
 

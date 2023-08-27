@@ -2,7 +2,7 @@
 #define __WINDOW_IMPL_H__
 
 #include "WindowTemplate.h"
-#include "RenderBase.h"
+#include "DrawTriangleThread.h"
 
 namespace window {
     class WindowImpl : public WindowTemplate
@@ -15,10 +15,10 @@ namespace window {
         virtual void Initialize() override;
         virtual void Update() override;
         virtual void CleanUp() override;
-        virtual void OnFramebufferResize(GLFWwindow* window, int width, int height) override;
+        virtual void OnFramebufferResized(GLFWwindow* window, int width, int height) override;
 
     private:
-        render::RenderBase* mRenderer = nullptr;
+        render::DrawTriangleThread* mDrawTriangleThread = nullptr;
     };
 }
 

@@ -1,13 +1,14 @@
-#ifndef __RENDER_BASE_H__
-#define __RENDER_BASE_H__
+#ifndef __DRAW_TRIANGLE_THREAD_H__
+#define __DRAW_TRIANGLE_THREAD_H__
 
-#include <vector>
-#include <vulkan/vulkan.h>
-
+#include "Thread.h"
 #include "GraphicsDevice.h"
 #include "Swapchain.h"
 #include "PipelineTest.h"
 #include "RenderPassTest.h"
+
+#include <vector>
+#include <vulkan/vulkan.h>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -18,22 +19,12 @@ namespace window {
 }
 
 namespace render {
-    struct UboMvpMatrix {
-        glm::mat4 model;
-        glm::mat4 view;
-        glm::mat4 proj;
-    };
-
-    class RenderBase {
+    class DrawTriangleThread : public common::Thread {
     public:
-        explicit RenderBase(window::WindowTemplate& a);
-        ~RenderBase();
+        explicit DrawTriangleThread(window::WindowTemplate& a);
+        ~DrawTriangleThread();
 
-        void Init(bool enableValidationLayer);
-        void CleanUp();
-        void Update();
-
-        void SetFramebufferResized() { mFramebufferResized = true; }
+        void SetFramebufferResized();
 
     private:
         // ----- rener functions -----
@@ -65,14 +56,20 @@ namespace render {
         void CreateDescriptorPool();
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
-        
+
         // ----- tool functions -----
         void CheckValidationLayerSupport(bool enableValidationLayer);
         bool CheckExtensionSupport(const std::vector<const char*>& target);
 
     private:
+        virtual void OnThreadInit() override;
+        virtual void OnThreadLoop() override;
+        virtual void OnThreadDestroy() override;
+
+    private:
         bool mEnableValidationLayer = false;
         bool mFramebufferResized = false;
+        std::mutex mFramebufferResizeMutex;
 
         // ---- externel objects ----
         window::WindowTemplate& mWindow;
@@ -120,6 +117,5 @@ namespace render {
     };
 }
 
-
-#endif // __RENDER_BASE_H__
+#endif // !__DRAW_TRIANGLE_THREAD_H__
 

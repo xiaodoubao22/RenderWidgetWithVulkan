@@ -23,12 +23,12 @@ namespace window {
         virtual void Initialize() = 0;
         virtual void Update() = 0;
         virtual void CleanUp() = 0;
-        virtual void OnFramebufferResize(GLFWwindow* window, int width, int height) = 0;
+        virtual void OnFramebufferResized(GLFWwindow* window, int width, int height) = 0;
 
     private:
         static void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
             auto windowTemplate = reinterpret_cast<WindowTemplate*>(glfwGetWindowUserPointer(window));
-            windowTemplate->OnFramebufferResize(window, width, height);
+            windowTemplate->OnFramebufferResized(window, width, height);
         }
 
     protected:
