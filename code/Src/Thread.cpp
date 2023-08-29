@@ -49,6 +49,7 @@ namespace common {
                 mThreadActiveCondition.notify_one();
             }
         }
+
         OnThreadDestroy();
     }
 }

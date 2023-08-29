@@ -60,7 +60,7 @@ namespace render {
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = mDescriptorSetLayouts.size();
-        pipelineLayoutInfo.pSetLayouts = mDescriptorSetLayouts.data();
+        pipelineLayoutInfo.pSetLayouts = mDescriptorSetLayouts.size() == 0 ? nullptr : mDescriptorSetLayouts.data();
         pipelineLayoutInfo.pushConstantRangeCount = 0;
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
         if (vkCreatePipelineLayout(GetGraphicsDevice()->GetDevice(), &pipelineLayoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS) {

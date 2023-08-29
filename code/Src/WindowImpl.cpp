@@ -4,16 +4,17 @@
 namespace window {
     WindowImpl::WindowImpl(bool resizable) : WindowTemplate(resizable)
     {
-        mDrawTriangleThread = new render::DrawTriangleThread(*this);
+        //mRenderThread = new render::DrawTriangleThread(*this);
+        mRenderThread = new render::DrawTextureThread(*this);
     }
 
     WindowImpl::~WindowImpl() {
-        mDrawTriangleThread->Destroy();
-        delete mDrawTriangleThread;
+        mRenderThread->Destroy();
+        delete mRenderThread;
     }
 
     void WindowImpl::Initialize() {
-        mDrawTriangleThread->Start();
+        mRenderThread->Start();
     }
 
     void WindowImpl::Update() {
@@ -21,21 +22,22 @@ namespace window {
     }
 
     void WindowImpl::CleanUp() {
-        mDrawTriangleThread->Stop();
+        mRenderThread->Stop();
     }
 
     void WindowImpl::OnFramebufferResized(int width, int height) {
-        mDrawTriangleThread->SetFramebufferResized();
+        //static_cast<render::DrawTriangleThread*>(mRenderThread)->SetFramebufferResized();
+        static_cast<render::DrawTextureThread*>(mRenderThread)->SetFramebufferResized();
 
         if (width == 0 || height == 0) {
             if (mIsMinimized == false) {
-                mDrawTriangleThread->Stop();    // 最小化时停止渲染线程
+                mRenderThread->Stop();    // 最小化时停止渲染线程
             }
             mIsMinimized = true;
         }
         else {
             if (mIsMinimized == true) {
-                mDrawTriangleThread->Start();   // 恢复时打开渲染线程
+                mRenderThread->Start();   // 恢复时打开渲染线程
             }
             mIsMinimized = false;
         }

@@ -1,61 +1,62 @@
-#include "PipelineTest.h"
+#include "PipelineDrawTexture.h"
 #include "Utils.h"
 #include "Mesh.h"
 
 #include <stdexcept>
 
 namespace render {
-    PipelineTest::PipelineTest() {
+	PipelineDrawTexture::PipelineDrawTexture() {
 
-    }
+	}
 
-    PipelineTest::~PipelineTest() {
+	PipelineDrawTexture::~PipelineDrawTexture() {
 
-    }
+	}
 
-	std::vector<VkDescriptorPoolSize> PipelineTest::GetDescriptorSize() {	
-		std::vector<VkDescriptorPoolSize> descriptorSize(1);
-		descriptorSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorSize[0].descriptorCount = 1;
+	std::vector<VkDescriptorPoolSize> PipelineDrawTexture::GetDescriptorSize() {
+		std::vector<VkDescriptorPoolSize> descriptorSize(0);
+		//std::vector<VkDescriptorPoolSize> descriptorSize(1);
+		//descriptorSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		//descriptorSize[0].descriptorCount = 1;
 
 		return descriptorSize;
 	}
 
-    void PipelineTest::CreateShaderModules(ShaderModules& shaderModules) {
-        shaderModules = {};
+	void PipelineDrawTexture::CreateShaderModules(ShaderModules& shaderModules) {
+		shaderModules = {};
 
-        // 读取shader
-		auto vertShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTriangleTestVert.spv"));
-		auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTriangleTestFrag.spv"));
+		// 读取shader
+		auto vertShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTextureTestVert.spv"));
+		auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTextureTestFrag.spv"));
 
-        // 创建
-        shaderModules.vertexShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), vertShaderCode);
-        shaderModules.fragmentShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), fragShaderCode);
-        return;
-    }
-
-	void PipelineTest::CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) {
-		descriptorSetLayouts = std::vector<VkDescriptorSetLayout>(1);
-
-		// descriptor bindings
-		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(1);
-		layoutBindings[0].binding = 0;
-		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		layoutBindings[0].descriptorCount = 1;
-		layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		layoutBindings[0].pImmutableSamplers = nullptr; // Optional
-
-		// descriptor layout
-		VkDescriptorSetLayoutCreateInfo layoutInfo{};
-		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.bindingCount = layoutBindings.size();
-		layoutInfo.pBindings = layoutBindings.data();
-		if (vkCreateDescriptorSetLayout(GetGraphicsDevice()->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create descriptor set layout!");
-		}
+		// 创建
+		shaderModules.vertexShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), vertShaderCode);
+		shaderModules.fragmentShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), fragShaderCode);
+		return;
 	}
 
-    void PipelineTest::ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& configInfo) {
+	void PipelineDrawTexture::CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) {
+		//descriptorSetLayouts = std::vector<VkDescriptorSetLayout>(1);
+
+		//// descriptor bindings
+		//std::vector<VkDescriptorSetLayoutBinding> layoutBindings(1);
+		//layoutBindings[0].binding = 0;
+		//layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		//layoutBindings[0].descriptorCount = 1;
+		//layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//layoutBindings[0].pImmutableSamplers = nullptr; // Optional
+
+		//// descriptor layout
+		//VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		//layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		//layoutInfo.bindingCount = layoutBindings.size();
+		//layoutInfo.pBindings = layoutBindings.data();
+		//if (vkCreateDescriptorSetLayout(GetGraphicsDevice()->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
+		//	throw std::runtime_error("failed to create descriptor set layout!");
+		//}
+	}
+
+	void PipelineDrawTexture::ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& configInfo) {
 		// shader stage
 		VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -92,8 +93,8 @@ namespace render {
 		configInfo.shaderStageInfo = { vertShaderStageInfo, fragShaderStageInfo };
 
 		// 顶点输入
-		configInfo.vertexBindingDescriptions = { Vertex2DColor::GetBindingDescription() };
-		configInfo.vertexAttributeDescriptions = Vertex2DColor::getAttributeDescriptions();
+		configInfo.vertexBindingDescriptions = { Vertex2DColorTexture::GetBindingDescription() };
+		configInfo.vertexAttributeDescriptions = Vertex2DColorTexture::getAttributeDescriptions();
 
 		configInfo.vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		configInfo.vertexInputInfo.vertexBindingDescriptionCount = configInfo.vertexBindingDescriptions.size();
@@ -172,5 +173,5 @@ namespace render {
 		configInfo.dynamicStateCreateInfo.dynamicStateCount = configInfo.dynamicStates.size();
 		configInfo.dynamicStateCreateInfo.pDynamicStates = configInfo.dynamicStates.data();
 		return;
-    }
+	}
 }

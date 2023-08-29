@@ -15,6 +15,7 @@ namespace window {
         mWindow = glfwCreateWindow(WIDTH, HEIGHT, "render widget", nullptr, nullptr);
         glfwSetWindowUserPointer(mWindow, this);
         glfwSetFramebufferSizeCallback(mWindow, FramebufferSizeCallback);
+        glfwSetWindowSizeLimits(mWindow, 200, 200, GLFW_DONT_CARE, GLFW_DONT_CARE);
     }
 
     WindowTemplate::~WindowTemplate() {

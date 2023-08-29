@@ -3,6 +3,7 @@
 
 #include "WindowTemplate.h"
 #include "DrawTriangleThread.h"
+#include "DrawTextureThread.h"
 
 namespace window {
     class WindowImpl : public WindowTemplate
@@ -18,7 +19,7 @@ namespace window {
         virtual void OnFramebufferResized(int width, int height) override;
 
     private:
-        render::DrawTriangleThread* mDrawTriangleThread = nullptr;
+        common::Thread* mRenderThread = nullptr;
 
         bool mIsMinimized = false;
     };

@@ -9,7 +9,7 @@ namespace render {
     class RenderPassTemplate {
     public:
         RenderPassTemplate();
-        ~RenderPassTemplate();
+        virtual ~RenderPassTemplate();
 
         void Init(GraphicsDevice* graphicsDevice, Swapchain* swapchain);
         void CleanUp();

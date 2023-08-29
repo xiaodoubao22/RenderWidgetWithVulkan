@@ -12,7 +12,7 @@ namespace window {
     class WindowTemplate {
     public:
         explicit WindowTemplate(bool resizable);
-        ~WindowTemplate();
+        virtual ~WindowTemplate();
 
         void Exec();
         VkSurfaceKHR CreateSurface(VkInstance instance);

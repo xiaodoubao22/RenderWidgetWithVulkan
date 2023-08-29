@@ -53,7 +53,6 @@ namespace render {
 			return false;
 		}
 
-
 		DestroyImageViews();
 		
 		VkSwapchainKHR oldSwapchain = mSwapChain;

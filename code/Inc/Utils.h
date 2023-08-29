@@ -27,6 +27,8 @@ namespace setting {
 
     const std::string dirSpvFiles = "../spv_files/";
 
+    const std::string dirTexture = "../resource/textures/";
+
 }
 
 namespace consts {

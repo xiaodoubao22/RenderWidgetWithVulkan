@@ -231,6 +231,56 @@ namespace render {
 		EndSingleTimeCommands(commandBuffer);
 	}
 
+	void GraphicsDevice::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+		VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+
+		VkBufferImageCopy region{};
+		region.bufferOffset = 0;
+		region.bufferRowLength = 0;
+		region.bufferImageHeight = 0;
+
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.mipLevel = 0;
+		region.imageSubresource.baseArrayLayer = 0;
+		region.imageSubresource.layerCount = 1;
+
+		region.imageOffset = { 0, 0, 0 };
+		region.imageExtent = { width, height, 1 };
+
+		vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+		EndSingleTimeCommands(commandBuffer);
+	}
+
+	void GraphicsDevice::TransitionImageLayout(VkImage image, VkImageAspectFlags aspectMask, const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels) {
+		VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+
+		VkImageMemoryBarrier barrier{};	// 可用来转换Image格式，也可用来转换队列组所有权
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.srcAccessMask = barrierInfo.srcAccessMask;
+		barrier.dstAccessMask = barrierInfo.dstAccessMask;
+		barrier.oldLayout = barrierInfo.oldLayout;
+		barrier.newLayout = barrierInfo.newLayout;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;	// 如果不用来转换队列族所有权，必须设置为ignored(非默认)
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = image;
+		barrier.subresourceRange.aspectMask = aspectMask;
+		barrier.subresourceRange.baseMipLevel = 0;		// mipmap级别
+		barrier.subresourceRange.levelCount = mipLevels;
+		barrier.subresourceRange.baseArrayLayer = 0;	// 图像数组
+		barrier.subresourceRange.layerCount = 1;
+
+		vkCmdPipelineBarrier(commandBuffer,
+			barrierInfo.srcStage, barrierInfo.dstStage,			// srcStageMask    dstStageMask
+			0,				// dependencyFlags
+			0, nullptr,		// memory barrier
+			0, nullptr,		// buffer memory barrier
+			1, &barrier		// image memory barrier
+		);
+
+		EndSingleTimeCommands(commandBuffer);
+	}
+
 	void GraphicsDevice::PickPhysicalDevices() {
 		// 获取所有物理设备
 		uint32_t deviceCount = 0;

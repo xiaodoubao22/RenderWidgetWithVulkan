@@ -9,7 +9,7 @@ namespace common {
     class Thread {
     public:
         Thread();
-        ~Thread();
+        virtual ~Thread();
 
         void Start();
         void Stop();

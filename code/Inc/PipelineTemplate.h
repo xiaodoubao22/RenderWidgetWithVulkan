@@ -38,7 +38,7 @@ namespace render {
     class PipelineTemplate {
     public:
         PipelineTemplate();
-        ~PipelineTemplate();
+        virtual ~PipelineTemplate();
 
         void Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, const RenderPassInfo& renderPassInfo);
         void CleanUp();

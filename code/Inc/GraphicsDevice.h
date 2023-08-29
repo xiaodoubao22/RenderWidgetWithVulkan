@@ -22,6 +22,15 @@ namespace render {
         std::vector<VkPresentModeKHR> presentModes = {};
     };
 
+    struct ImageMemoryBarrierInfo {
+        VkImageLayout oldLayout;
+        VkImageLayout newLayout;
+        VkPipelineStageFlags srcStage;
+        VkAccessFlags srcAccessMask;
+        VkPipelineStageFlags dstStage;
+        VkAccessFlags dstAccessMask;
+    };
+
     class GraphicsDevice {
     public:
         GraphicsDevice();
@@ -47,6 +56,8 @@ namespace render {
         VkCommandBuffer BeginSingleTimeCommands();
         void EndSingleTimeCommands(VkCommandBuffer commandBuffer);
         void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+        void TransitionImageLayout(VkImage image, VkImageAspectFlags aspectMask, const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels = 1);
 
     private:
         void PickPhysicalDevices();
