@@ -14,10 +14,9 @@ namespace render {
 	}
 
 	std::vector<VkDescriptorPoolSize> PipelineDrawTexture::GetDescriptorSize() {
-		std::vector<VkDescriptorPoolSize> descriptorSize(0);
-		//std::vector<VkDescriptorPoolSize> descriptorSize(1);
-		//descriptorSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		//descriptorSize[0].descriptorCount = 1;
+		std::vector<VkDescriptorPoolSize> descriptorSize(1);
+		descriptorSize[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorSize[0].descriptorCount = 1;
 
 		return descriptorSize;
 	}
@@ -36,24 +35,24 @@ namespace render {
 	}
 
 	void PipelineDrawTexture::CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) {
-		//descriptorSetLayouts = std::vector<VkDescriptorSetLayout>(1);
+		descriptorSetLayouts = std::vector<VkDescriptorSetLayout>(1);
 
-		//// descriptor bindings
-		//std::vector<VkDescriptorSetLayoutBinding> layoutBindings(1);
-		//layoutBindings[0].binding = 0;
-		//layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		//layoutBindings[0].descriptorCount = 1;
-		//layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		//layoutBindings[0].pImmutableSamplers = nullptr; // Optional
+		// descriptor bindings
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(1);
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[0].pImmutableSamplers = nullptr; // Optional
 
-		//// descriptor layout
-		//VkDescriptorSetLayoutCreateInfo layoutInfo{};
-		//layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		//layoutInfo.bindingCount = layoutBindings.size();
-		//layoutInfo.pBindings = layoutBindings.data();
-		//if (vkCreateDescriptorSetLayout(GetGraphicsDevice()->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
-		//	throw std::runtime_error("failed to create descriptor set layout!");
-		//}
+		// descriptor layout
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = layoutBindings.size();
+		layoutInfo.pBindings = layoutBindings.data();
+		if (vkCreateDescriptorSetLayout(GetGraphicsDevice()->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create descriptor set layout!");
+		}
 	}
 
 	void PipelineDrawTexture::ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& configInfo) {

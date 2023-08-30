@@ -64,6 +64,7 @@ namespace render {
         CreateVertexBuffer();
         CreateIndexBuffer();
         CreateTexture();
+        CreateTextureSampler();
         CreateDescriptorPool();
         CreateDescriptorSets();
     }
@@ -122,6 +123,7 @@ namespace render {
 
         // destroy render objects
         CleanUpDescriptorPool();
+        CleanUpTextureSampler();
         CleanUpTexture();
         CleanUpIndexBuffer();
         CleanUpVertexBuffer();
@@ -188,11 +190,11 @@ namespace render {
         // 绑定索引缓冲
         vkCmdBindIndexBuffer(commandBuffer, mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-        //// 绑定DescriptorSet
-        //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        //    mPipelineDrawTexture->GetPipelineLayout(),
-        //    0, 1, &mDescriptorSet,
-        //    0, nullptr);
+        // 绑定DescriptorSet
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            mPipelineDrawTexture->GetPipelineLayout(),
+            0, 1, &mDescriptorSet,
+            0, nullptr);
 
         //画图
         vkCmdDrawIndexed(commandBuffer, gQuadIndices.size(), 1, 0, 0, 0);
@@ -440,7 +442,7 @@ namespace render {
     void DrawTextureThread::CreateTexture() {
         // 读取图片
         int texWidth, texHeight, texChannels;
-        std::string texturePath = setting::dirTexture + std::string("test_texure.jpg");
+        std::string texturePath = setting::dirTexture + std::string("awesomeface.jpg");
         stbi_uc* pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
         if (!pixels) {
@@ -462,8 +464,6 @@ namespace render {
         vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
         stbi_image_free(pixels);
 
-        
-
         // 创建纹理图像
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -473,7 +473,7 @@ namespace render {
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
-        imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+        imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -514,7 +514,7 @@ namespace render {
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = mTestTextureImage;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+        viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
@@ -529,6 +529,44 @@ namespace render {
         vkDestroyImageView(mGraphicsDevice->GetDevice(), mTestTextureImageView, nullptr);
         vkDestroyImage(mGraphicsDevice->GetDevice(), mTestTextureImage, nullptr);
         vkFreeMemory(mGraphicsDevice->GetDevice(), mTestTextureImageMemory, nullptr);
+    }
+
+    void DrawTextureThread::CreateTextureSampler() {
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+        // 关闭各向异性滤波
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 1.0f;
+
+        // border color
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+        // true:[0,texWidth][0,texHeight]  false:[0,1][0,1]
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+        // 比较：不开启， 主要用在shadow-map的PCF中
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+        // mipmap
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = static_cast<float>(1);
+
+        if (vkCreateSampler(mGraphicsDevice->GetDevice(), &samplerInfo, nullptr, &mTexureSampler) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texure sampler!");
+        }
+    }
+
+    void DrawTextureThread::CleanUpTextureSampler() {
+        vkDestroySampler(mGraphicsDevice->GetDevice(), mTexureSampler, nullptr);
     }
 
     void DrawTextureThread::CreateDescriptorPool() {
@@ -552,32 +590,32 @@ namespace render {
         std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPipelineDrawTexture->GetDescriptorSetLayouts();
 
         //// 从池中申请descriptor set
-        //VkDescriptorSetAllocateInfo allocInfo{};
-        //allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        //allocInfo.descriptorPool = mDescriptorPool;		// 从这个池中申请
-        //allocInfo.descriptorSetCount = descriptorSetLayouts.size();
-        //allocInfo.pSetLayouts = descriptorSetLayouts.data();
-        //if (vkAllocateDescriptorSets(mGraphicsDevice->GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS) {
-        //    throw std::runtime_error("failed to allocate descriptor sets!");
-        //}
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = mDescriptorPool;		// 从这个池中申请
+        allocInfo.descriptorSetCount = descriptorSetLayouts.size();
+        allocInfo.pSetLayouts = descriptorSetLayouts.data();
+        if (vkAllocateDescriptorSets(mGraphicsDevice->GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
 
-        //// 向descriptor set写入信息，个人理解目的是绑定buffer
-        //std::vector<VkDescriptorBufferInfo> bufferInfos(1);
-        //bufferInfos[0].buffer = mUniformBuffer;     // mvp矩阵的ubo
-        //bufferInfos[0].offset = 0;
-        //bufferInfos[0].range = sizeof(UboMvpMatrix);
+        // 向descriptor set写入信息，个人理解目的是绑定buffer
+        std::vector<VkDescriptorImageInfo> imageInfos(1);
+        imageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfos[0].imageView = mTestTextureImageView;
+        imageInfos[0].sampler = mTexureSampler;
 
-        //std::vector<VkWriteDescriptorSet> descriptorWrites(1);
-        //descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        //descriptorWrites[0].dstSet = mDescriptorSet;
-        //descriptorWrites[0].dstBinding = 0;
-        //descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        //descriptorWrites[0].dstArrayElement = 0;		// descriptors can be arrays
-        //descriptorWrites[0].descriptorCount = 1;	    // 想要更新多少个元素（从索引dstArrayElement开始）
-        //descriptorWrites[0].pBufferInfo = &bufferInfos[0];			//  ->
-        //descriptorWrites[0].pImageInfo = nullptr;					//  -> 三选一
-        //descriptorWrites[0].pTexelBufferView = nullptr;				//  ->
-        //vkUpdateDescriptorSets(mGraphicsDevice->GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+        std::vector<VkWriteDescriptorSet> descriptorWrites(1);
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = mDescriptorSet;
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[0].dstArrayElement = 0;		// descriptors can be arrays
+        descriptorWrites[0].descriptorCount = 1;	    // 想要更新多少个元素（从索引dstArrayElement开始）
+        descriptorWrites[0].pBufferInfo = nullptr;			            //  ->
+        descriptorWrites[0].pImageInfo = imageInfos.data();				//  -> 三选一
+        descriptorWrites[0].pTexelBufferView = nullptr;				    //  ->
+        vkUpdateDescriptorSets(mGraphicsDevice->GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
 
     void DrawTextureThread::CheckValidationLayerSupport(bool enableValidationLayer) {

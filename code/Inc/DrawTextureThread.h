@@ -54,6 +54,9 @@ namespace render {
         void CreateTexture();
         void CleanUpTexture();
 
+        void CreateTextureSampler();
+        void CleanUpTextureSampler();
+
         void CreateDescriptorPool();
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
@@ -106,7 +109,9 @@ namespace render {
         VkImage mTestTextureImage = VK_NULL_HANDLE;
         VkDeviceMemory mTestTextureImageMemory = VK_NULL_HANDLE;
         VkImageView mTestTextureImageView = VK_NULL_HANDLE;
+        VkSampler mTexureSampler = VK_NULL_HANDLE;
 
+        // descriptors
         VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
         VkDescriptorSet mDescriptorSet = VK_NULL_HANDLE;
     };
