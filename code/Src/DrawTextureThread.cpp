@@ -14,10 +14,10 @@
 
 namespace render {
     std::vector<Vertex2DColorTexture> gQuadVertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},     // 左上
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},      // 右上
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},       // 右下
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}       // 左下
     };
 
     const std::vector<uint16_t> gQuadIndices = {
@@ -442,7 +442,8 @@ namespace render {
     void DrawTextureThread::CreateTexture() {
         // 读取图片
         int texWidth, texHeight, texChannels;
-        std::string texturePath = setting::dirTexture + std::string("awesomeface.jpg");
+        std::string texturePath = setting::dirTexture + std::string("test_texure.jpg");
+        stbi_set_flip_vertically_on_load(true);
         stbi_uc* pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
         if (!pixels) {
