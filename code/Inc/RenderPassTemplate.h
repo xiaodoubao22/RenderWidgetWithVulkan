@@ -14,7 +14,7 @@ namespace render {
         void Init(GraphicsDevice* graphicsDevice, Swapchain* swapchain);
         void CleanUp();
 
-        VkRenderPass GetRenderPass() { return mRenderPass; }
+        VkRenderPass Get() { return mRenderPass; }
         std::vector<VkAttachmentDescription>& GetAttachments() { return mAttachments; }
 
     protected:

@@ -3,28 +3,31 @@
 #include <stdexcept>
 
 namespace render {
-    RenderPassTest::RenderPassTest() {
+    RenderPassTest::RenderPassTest() {}
 
-    }
-
-    RenderPassTest::~RenderPassTest() {
-
-    }
+    RenderPassTest::~RenderPassTest() {}
 
     void RenderPassTest::FillAttachmentDescriptions(std::vector<VkAttachmentDescription>& attachments) {
 		attachments.clear();
 		attachments.resize(2);
+
+		// 查找合适的深度缓冲格式
+		mDepthFormat = GetGraphicsDevice()->FindSupportedFormat(
+			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
 		// 颜色附件
-		attachments[0].format = GetSwapchain()->GetFormat();		// 格式+颜色空间
-		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;	// 多重采样
+		attachments[0].format = GetSwapchain()->GetFormat();		// 格式
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;				// 多重采样
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;				// 渲染前清屏
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;				// 渲染后储存
-		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// 模板操作此处不用
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;		// 模板操作此处不用
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 模板操作此处不用
 		attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// 进来的格式无所谓
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // 渲染后被设为该格式(作为颜色附件)
 		// 深度附件
-		attachments[1].format = FindDepthFormat();
+		attachments[1].format = mDepthFormat;
 		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;		// 渲染前清屏
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 渲染后不关心
@@ -77,11 +80,4 @@ namespace render {
 			throw std::runtime_error("failed to create render pass!");
 		}
     }
-
-	VkFormat RenderPassTest::FindDepthFormat() {
-		return GetGraphicsDevice()->FindSupportedFormat(
-			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-	}
 }

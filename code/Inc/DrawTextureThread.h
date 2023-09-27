@@ -6,6 +6,7 @@
 #include "Swapchain.h"
 #include "PipelineDrawTexture.h"
 #include "RenderPassTest.h"
+#include "RenderBase.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -15,10 +16,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace render {
-    class DrawTextureThread : public common::Thread
-    {
+    class DrawTextureThread : public common::Thread, public RenderBase {
     public:
-        explicit DrawTextureThread(window::WindowTemplate& a);
+        explicit DrawTextureThread(window::WindowTemplate& w);
         ~DrawTextureThread();
 
         void SetFramebufferResized();
@@ -34,8 +34,6 @@ namespace render {
         void Resize();
 
         // ----- create and clean up ----- 
-        void CreateInstance();
-
         void CreateDepthResources();
         void CleanUpDepthResources();
 
@@ -61,24 +59,9 @@ namespace render {
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
 
-        // ----- tool functions -----
-        void CheckValidationLayerSupport(bool enableValidationLayer);
-        bool CheckExtensionSupport(const std::vector<const char*>& target);
-
     private:
-        bool mEnableValidationLayer = false;
         bool mFramebufferResized = false;
         std::mutex mFramebufferResizeMutex;
-
-        // ---- externel objects ----
-        window::WindowTemplate& mWindow;
-
-        // ---- basic objects ----
-        VkInstance mInstance = VK_NULL_HANDLE;
-        VkSurfaceKHR mSurface = VK_NULL_HANDLE;
-
-        GraphicsDevice* mGraphicsDevice = nullptr;
-        Swapchain* mSwapchain = nullptr;
 
         // ---- render objects ----
         RenderPassTest* mRenderPassTest = nullptr;

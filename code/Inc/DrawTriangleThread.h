@@ -6,6 +6,7 @@
 #include "Swapchain.h"
 #include "PipelineTest.h"
 #include "RenderPassTest.h"
+#include "RenderBase.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -19,9 +20,9 @@ namespace window {
 }
 
 namespace render {
-    class DrawTriangleThread : public common::Thread {
+    class DrawTriangleThread : public common::Thread, public RenderBase {
     public:
-        explicit DrawTriangleThread(window::WindowTemplate& a);
+        explicit DrawTriangleThread(window::WindowTemplate& w);
         ~DrawTriangleThread();
 
         void SetFramebufferResized();
@@ -38,8 +39,6 @@ namespace render {
         void Resize();
 
         // ----- create and clean up ----- 
-        void CreateInstance();
-
         void CreateDepthResources();
         void CleanUpDepthResources();
 
@@ -62,24 +61,9 @@ namespace render {
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
 
-        // ----- tool functions -----
-        void CheckValidationLayerSupport(bool enableValidationLayer);
-        bool CheckExtensionSupport(const std::vector<const char*>& target);
-
     private:
-        bool mEnableValidationLayer = false;
         bool mFramebufferResized = false;
         std::mutex mFramebufferResizeMutex;
-
-        // ---- externel objects ----
-        window::WindowTemplate& mWindow;
-
-        // ---- basic objects ----
-        VkInstance mInstance = VK_NULL_HANDLE;
-        VkSurfaceKHR mSurface = VK_NULL_HANDLE;
-
-        GraphicsDevice* mGraphicsDevice = nullptr;
-        Swapchain* mSwapchain = nullptr;
 
         // ---- render objects ----
         RenderPassTest* mRenderPassTest = nullptr;

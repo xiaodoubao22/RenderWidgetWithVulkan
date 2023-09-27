@@ -20,7 +20,6 @@ namespace render {
         bool CleanUp();
         bool Recreate(VkExtent2D windowExtent);
 
-        VkSwapchainKHR GetSwapchain() { return mSwapChain; }
         VkFormat GetFormat() { return mSwapchainImageFormat; }
         std::vector<VkImageView> GetImageViews() { return mSwapchainImageViews; }
         VkExtent2D GetExtent() { return mSwapchainExtent; }

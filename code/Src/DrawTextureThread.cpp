@@ -24,10 +24,8 @@ namespace render {
         0, 1, 2, 2, 3, 0
     };
 
-    DrawTextureThread::DrawTextureThread(window::WindowTemplate& a) : mWindow(a)
+    DrawTextureThread::DrawTextureThread(window::WindowTemplate& w) : RenderBase(w)
     {
-        mGraphicsDevice = new GraphicsDevice();
-        mSwapchain = new Swapchain();
         mRenderPassTest = new RenderPassTest();
         mPipelineDrawTexture = new PipelineDrawTexture();
     }
@@ -35,8 +33,6 @@ namespace render {
     DrawTextureThread::~DrawTextureThread() {
         delete mPipelineDrawTexture;
         delete mRenderPassTest;
-        delete mSwapchain;
-        delete mGraphicsDevice;
     }
 
     void DrawTextureThread::SetFramebufferResized() {
@@ -45,20 +41,14 @@ namespace render {
     }
 
     void DrawTextureThread::OnThreadInit() {
-        CheckValidationLayerSupport(setting::enableValidationLayer);
-
-        // create basic objects
-        CreateInstance();
-        DebugUtils::GetInstance().Setup(mInstance);
-        mSurface = mWindow.CreateSurface(mInstance);
-        mGraphicsDevice->Init(mInstance, mSurface);
-        mSwapchain->Init(mGraphicsDevice, mWindow.GetWindowExtent(), mSurface);
+        RenderBase::Init();
 
         // create render objects
         CreateSyncObjects();
-        mRenderPassTest->Init(mGraphicsDevice, mSwapchain);
-        mPipelineDrawTexture->Init(mGraphicsDevice, mWindow.GetWindowExtent(), { mRenderPassTest->GetRenderPass(), 0 });
-        mCommandBuffer = mGraphicsDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+        mRenderPassTest->Init(RenderBase::mGraphicsDevice, RenderBase::mSwapchain);
+        mPipelineDrawTexture->Init(RenderBase::mGraphicsDevice, RenderBase::mWindow.GetWindowExtent(),
+            { mRenderPassTest->Get(), 0 });
+        mCommandBuffer = RenderBase::mGraphicsDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
         CreateFramebuffers();
         CreateVertexBuffer();
@@ -70,15 +60,18 @@ namespace render {
     }
 
     void DrawTextureThread::OnThreadLoop() {
-        // 等待前一帧结束(等待队列中的命令执行完)，然后上锁，表示开始画了
-        vkWaitForFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
-        vkResetFences(mGraphicsDevice->GetDevice(), 1, &mInFlightFence);
-
+        // 等待前一帧结束(等待队列中的命令执行完)
+        vkWaitForFences(RenderBase::GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
+    
         // 获取图像
         uint32_t imageIndex;
         if (!mSwapchain->AcquireImage(mImageAvailableSemaphore, imageIndex)) {
             Resize();
+            return;     // 获取不到图像直接return，不渲染，不上锁
         }
+
+        // 开始画，上锁
+        vkResetFences(RenderBase::GetDevice(), 1, &mInFlightFence);
 
         // 记录命令
         vkResetCommandBuffer(mCommandBuffer, 0);
@@ -99,7 +92,7 @@ namespace render {
         submitInfo.signalSemaphoreCount = renderFinishedSemaphore.size();
         submitInfo.pSignalSemaphores = renderFinishedSemaphore.data();    // 指定命令执行完触发mRenderFinishedSemaphore，意思是等我画完再返回交换链
         // 把命令提交到图形队列中，第三个参数指定命令执行完毕后触发mInFlightFence，告诉CPU当前帧画完可以画下一帧了（解锁）
-        if (vkQueueSubmit(mGraphicsDevice->GetGraphicsQueue(), 1, &submitInfo, mInFlightFence) != VK_SUCCESS) {
+        if (vkQueueSubmit(RenderBase::mGraphicsDevice->GetGraphicsQueue(), 1, &submitInfo, mInFlightFence) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
 
@@ -116,10 +109,11 @@ namespace render {
                 Resize();
             }
         }
+        
     }
 
     void DrawTextureThread::OnThreadDestroy() {
-        vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
+        vkDeviceWaitIdle(RenderBase::GetDevice());
 
         // destroy render objects
         CleanUpDescriptorPool();
@@ -129,17 +123,13 @@ namespace render {
         CleanUpVertexBuffer();
         CleanUpFramebuffers();
         CleanUpDepthResources();
-        mGraphicsDevice->FreeCommandBuffer(mCommandBuffer);
+        RenderBase::mGraphicsDevice->FreeCommandBuffer(mCommandBuffer);
         mPipelineDrawTexture->CleanUp();
         mRenderPassTest->CleanUp();
         CleanUpSyncObjects();
 
         // destroy basic objects
-        mSwapchain->CleanUp();
-        mGraphicsDevice->CleanUp();
-        vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
-        DebugUtils::GetInstance().Destroy(mInstance);
-        vkDestroyInstance(mInstance, nullptr);
+        RenderBase::CleanUp();
     }
 
     void DrawTextureThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
@@ -159,7 +149,7 @@ namespace render {
         };
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = mRenderPassTest->GetRenderPass();
+        renderPassInfo.renderPass = mRenderPassTest->Get();
         renderPassInfo.framebuffer = mSwapchainFramebuffers[imageIndex];
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = mSwapchain->GetExtent();
@@ -209,10 +199,8 @@ namespace render {
         }
     }
 
-
     void DrawTextureThread::Resize() {
-        //std::cout << "recreate" << mWindow.GetWindowExtent().width << " " << mWindow.GetWindowExtent().height << std::endl;
-        vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
+        vkDeviceWaitIdle(RenderBase::GetDevice());
 
         CleanUpFramebuffers();
         CleanUpDepthResources();
@@ -220,50 +208,6 @@ namespace render {
         mSwapchain->Recreate(mWindow.GetWindowExtent());
         CreateDepthResources();
         CreateFramebuffers();
-    }
-
-    void DrawTextureThread::CreateInstance() {
-        // 检查需要的拓展
-        auto extensions = mWindow.QueryWindowRequiredExtensions();
-        if (mEnableValidationLayer) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-        utils::PrintStringList(extensions, "extensions:");
-        if (!CheckExtensionSupport(extensions)) {
-            throw std::runtime_error("extension not all supported!");
-        }
-        else {
-            std::cout << "extensions are all supported" << std::endl;
-        }
-
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Hello Triangle";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
-
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
-        createInfo.enabledExtensionCount = extensions.size();
-        createInfo.ppEnabledExtensionNames = extensions.data();
-        createInfo.enabledLayerCount = 0;
-        createInfo.ppEnabledLayerNames = nullptr;
-        createInfo.pNext = nullptr;
-
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if (mEnableValidationLayer) {
-            render::DebugUtils::GetInstance().PopulateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.enabledLayerCount = consts::validationLayers.size();
-            createInfo.ppEnabledLayerNames = consts::validationLayers.data();
-            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
-        }
-
-        if (vkCreateInstance(&createInfo, nullptr, &mInstance) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create instance!");
-        }
     }
 
     void DrawTextureThread::CreateDepthResources() {
@@ -296,7 +240,7 @@ namespace render {
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(mGraphicsDevice->GetDevice(), &viewInfo, nullptr, &mDepthImageView) != VK_SUCCESS) {
+        if (vkCreateImageView(RenderBase::GetDevice(), &viewInfo, nullptr, &mDepthImageView) != VK_SUCCESS) {
             throw std::runtime_error("failed to create texture image view!");
         }
 
@@ -308,9 +252,9 @@ namespace render {
 
     void DrawTextureThread::CleanUpDepthResources() {
         // 销毁深度缓冲
-        vkDestroyImageView(mGraphicsDevice->GetDevice(), mDepthImageView, nullptr);
-        vkDestroyImage(mGraphicsDevice->GetDevice(), mDepthImage, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), mDepthImageMemory, nullptr);
+        vkDestroyImageView(RenderBase::GetDevice(), mDepthImageView, nullptr);
+        vkDestroyImage(RenderBase::GetDevice(), mDepthImage, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), mDepthImageMemory, nullptr);
     }
 
     void DrawTextureThread::CreateFramebuffers() {
@@ -325,14 +269,14 @@ namespace render {
 
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = mRenderPassTest->GetRenderPass();
+            framebufferInfo.renderPass = mRenderPassTest->Get();
             framebufferInfo.attachmentCount = attachments.size();	// framebuffer的附件个数
             framebufferInfo.pAttachments = attachments.data();								// framebuffer的附件
             framebufferInfo.width = mSwapchain->GetExtent().width;
             framebufferInfo.height = mSwapchain->GetExtent().height;
             framebufferInfo.layers = 1;		// single pass
 
-            if (vkCreateFramebuffer(mGraphicsDevice->GetDevice(), &framebufferInfo, nullptr, &mSwapchainFramebuffers[i]) != VK_SUCCESS) {
+            if (vkCreateFramebuffer(RenderBase::GetDevice(), &framebufferInfo, nullptr, &mSwapchainFramebuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create frambuffer!");
             }
         }
@@ -341,7 +285,7 @@ namespace render {
     void DrawTextureThread::CleanUpFramebuffers() {
         // 销毁frame buffer
         for (auto framebuffer : mSwapchainFramebuffers) {
-            vkDestroyFramebuffer(mGraphicsDevice->GetDevice(), framebuffer, nullptr);
+            vkDestroyFramebuffer(RenderBase::GetDevice(), framebuffer, nullptr);
         }
     }
 
@@ -353,17 +297,17 @@ namespace render {
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;		//（初始化解锁）
 
-        if (vkCreateSemaphore(mGraphicsDevice->GetDevice(), &semaphoreInfo, nullptr, &mImageAvailableSemaphore) != VK_SUCCESS ||
-            vkCreateSemaphore(mGraphicsDevice->GetDevice(), &semaphoreInfo, nullptr, &mRenderFinishedSemaphore) != VK_SUCCESS ||
-            vkCreateFence(mGraphicsDevice->GetDevice(), &fenceInfo, nullptr, &mInFlightFence) != VK_SUCCESS) {
+        if (vkCreateSemaphore(RenderBase::GetDevice(), &semaphoreInfo, nullptr, &mImageAvailableSemaphore) != VK_SUCCESS ||
+            vkCreateSemaphore(RenderBase::GetDevice(), &semaphoreInfo, nullptr, &mRenderFinishedSemaphore) != VK_SUCCESS ||
+            vkCreateFence(RenderBase::GetDevice(), &fenceInfo, nullptr, &mInFlightFence) != VK_SUCCESS) {
             throw std::runtime_error("failed to create semaphores!");
         }
     }
 
     void DrawTextureThread::CleanUpSyncObjects() {
-        vkDestroySemaphore(mGraphicsDevice->GetDevice(), mImageAvailableSemaphore, nullptr);
-        vkDestroySemaphore(mGraphicsDevice->GetDevice(), mRenderFinishedSemaphore, nullptr);
-        vkDestroyFence(mGraphicsDevice->GetDevice(), mInFlightFence, nullptr);
+        vkDestroySemaphore(RenderBase::GetDevice(), mImageAvailableSemaphore, nullptr);
+        vkDestroySemaphore(RenderBase::GetDevice(), mRenderFinishedSemaphore, nullptr);
+        vkDestroyFence(RenderBase::GetDevice(), mInFlightFence, nullptr);
     }
 
     void DrawTextureThread::CreateVertexBuffer() {
@@ -379,9 +323,9 @@ namespace render {
 
         // 数据拷贝到临时缓冲
         void* data;
-        vkMapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+        vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
         memcpy(data, gQuadVertices.data(), (size_t)bufferSize);
-        vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
+        vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建 mVertexBuffer
         mGraphicsDevice->CreateBuffer(bufferSize,
@@ -393,14 +337,14 @@ namespace render {
         mGraphicsDevice->CopyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
 
         // 清理临时缓冲
-        vkDestroyBuffer(mGraphicsDevice->GetDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, nullptr);
+        vkDestroyBuffer(RenderBase::GetDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
     }
 
     void DrawTextureThread::CleanUpVertexBuffer() {
         // 销毁顶点缓冲区及显存
-        vkDestroyBuffer(mGraphicsDevice->GetDevice(), mVertexBuffer, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), mVertexBufferMemory, nullptr);
+        vkDestroyBuffer(RenderBase::GetDevice(), mVertexBuffer, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), mVertexBufferMemory, nullptr);
     }
 
     void DrawTextureThread::CreateIndexBuffer() {
@@ -416,9 +360,9 @@ namespace render {
 
         // 数据拷贝到临时缓冲
         void* data;
-        vkMapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+        vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
         memcpy(data, gQuadIndices.data(), (size_t)bufferSize);
-        vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
+        vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建索引缓冲
         mGraphicsDevice->CreateBuffer(bufferSize,
@@ -430,13 +374,13 @@ namespace render {
         mGraphicsDevice->CopyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
 
         // 清理临时缓冲
-        vkDestroyBuffer(mGraphicsDevice->GetDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, nullptr);
+        vkDestroyBuffer(RenderBase::GetDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
     }
 
     void DrawTextureThread::CleanUpIndexBuffer() {
-        vkDestroyBuffer(mGraphicsDevice->GetDevice(), mIndexBuffer, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), mIndexBufferMemory, nullptr);
+        vkDestroyBuffer(RenderBase::GetDevice(), mIndexBuffer, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), mIndexBufferMemory, nullptr);
     }
 
     void DrawTextureThread::CreateTexture() {
@@ -460,9 +404,9 @@ namespace render {
 
         // 图像数据拷贝到临时缓冲，并释放pixels
         void* data;
-        vkMapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
+        vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
         memcpy(data, pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
+        vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
         stbi_image_free(pixels);
 
         // 创建纹理图像
@@ -507,8 +451,8 @@ namespace render {
         mGraphicsDevice->TransitionImageLayout(mTestTextureImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
         // 清理临时缓冲
-        vkDestroyBuffer(mGraphicsDevice->GetDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, nullptr);
+        vkDestroyBuffer(RenderBase::GetDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
 
         // 创建imageView
         VkImageViewCreateInfo viewInfo{};
@@ -521,15 +465,15 @@ namespace render {
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(mGraphicsDevice->GetDevice(), &viewInfo, nullptr, &mTestTextureImageView) != VK_SUCCESS) {
+        if (vkCreateImageView(RenderBase::GetDevice(), &viewInfo, nullptr, &mTestTextureImageView) != VK_SUCCESS) {
             throw std::runtime_error("failed to create texture image view!");
         }
     }
 
     void DrawTextureThread::CleanUpTexture() {
-        vkDestroyImageView(mGraphicsDevice->GetDevice(), mTestTextureImageView, nullptr);
-        vkDestroyImage(mGraphicsDevice->GetDevice(), mTestTextureImage, nullptr);
-        vkFreeMemory(mGraphicsDevice->GetDevice(), mTestTextureImageMemory, nullptr);
+        vkDestroyImageView(RenderBase::GetDevice(), mTestTextureImageView, nullptr);
+        vkDestroyImage(RenderBase::GetDevice(), mTestTextureImage, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), mTestTextureImageMemory, nullptr);
     }
 
     void DrawTextureThread::CreateTextureSampler() {
@@ -561,13 +505,13 @@ namespace render {
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = static_cast<float>(1);
 
-        if (vkCreateSampler(mGraphicsDevice->GetDevice(), &samplerInfo, nullptr, &mTexureSampler) != VK_SUCCESS) {
+        if (vkCreateSampler(RenderBase::GetDevice(), &samplerInfo, nullptr, &mTexureSampler) != VK_SUCCESS) {
             throw std::runtime_error("failed to create texure sampler!");
         }
     }
 
     void DrawTextureThread::CleanUpTextureSampler() {
-        vkDestroySampler(mGraphicsDevice->GetDevice(), mTexureSampler, nullptr);
+        vkDestroySampler(RenderBase::GetDevice(), mTexureSampler, nullptr);
     }
 
     void DrawTextureThread::CreateDescriptorPool() {
@@ -578,13 +522,13 @@ namespace render {
         poolInfo.poolSizeCount = poolSizes.size();
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = 1;   // 池中最大能申请descriptorSet的个数
-        if (vkCreateDescriptorPool(mGraphicsDevice->GetDevice(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(RenderBase::GetDevice(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
         }
     }
 
     void DrawTextureThread::CleanUpDescriptorPool() {
-        vkDestroyDescriptorPool(mGraphicsDevice->GetDevice(), mDescriptorPool, nullptr);
+        vkDestroyDescriptorPool(RenderBase::GetDevice(), mDescriptorPool, nullptr);
     }
 
     void DrawTextureThread::CreateDescriptorSets() {
@@ -596,7 +540,7 @@ namespace render {
         allocInfo.descriptorPool = mDescriptorPool;		// 从这个池中申请
         allocInfo.descriptorSetCount = descriptorSetLayouts.size();
         allocInfo.pSetLayouts = descriptorSetLayouts.data();
-        if (vkAllocateDescriptorSets(mGraphicsDevice->GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS) {
+        if (vkAllocateDescriptorSets(RenderBase::GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
         }
 
@@ -616,55 +560,6 @@ namespace render {
         descriptorWrites[0].pBufferInfo = nullptr;			            //  ->
         descriptorWrites[0].pImageInfo = imageInfos.data();				//  -> 三选一
         descriptorWrites[0].pTexelBufferView = nullptr;				    //  ->
-        vkUpdateDescriptorSets(mGraphicsDevice->GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
-    }
-
-    void DrawTextureThread::CheckValidationLayerSupport(bool enableValidationLayer) {
-        if (enableValidationLayer == false) {
-            std::cout << "validation layer disabled" << std::endl;
-            mEnableValidationLayer = false;
-            return;
-        }
-
-        // 获取支持的层
-        uint32_t layerCount;
-        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-        std::vector<VkLayerProperties> availableLayers(layerCount);
-        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-        // 提取名称
-        std::vector<const char*> availableLayerNames;
-        for (VkLayerProperties& layer : availableLayers) {
-            availableLayerNames.push_back(layer.layerName);
-        }
-
-        // 检查
-        utils::PrintStringList(consts::validationLayers, "validationLayers:");
-        if (utils::CheckSupported(consts::validationLayers, availableLayerNames)) {
-            std::cout << "validation layers are all supported" << std::endl;
-            mEnableValidationLayer = true;
-        }
-        else {
-            std::cerr << "validation layer enabled but not supported" << std::endl;
-            mEnableValidationLayer = false;
-        }
-        return;
-    }
-
-    bool DrawTextureThread::CheckExtensionSupport(const std::vector<const char*>& target) {
-        // 获取支持的拓展
-        uint32_t extensionCount = 0;
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-        std::vector<VkExtensionProperties> extensions(extensionCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-        // 提取名称
-        std::vector<const char*> supportExtensionNames;
-        for (VkExtensionProperties& extension : extensions) {
-            supportExtensionNames.push_back(extension.extensionName);
-        }
-
-        // 检查
-        return utils::CheckSupported(target, supportExtensionNames);
+        vkUpdateDescriptorSets(RenderBase::GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
 }

@@ -82,6 +82,9 @@ namespace render {
 	}
 
 	VkFormat GraphicsDevice::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+		if (mPhysicalDevice == VK_NULL_HANDLE) {
+			throw std::runtime_error("mPhysicalDevice is null");
+		}
 		for (VkFormat format : candidates) {
 			VkFormatProperties props;
 			vkGetPhysicalDeviceFormatProperties(mPhysicalDevice, format, &props);

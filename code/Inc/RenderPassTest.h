@@ -11,11 +11,10 @@ namespace render {
         virtual void FillAttachmentDescriptions(std::vector<VkAttachmentDescription>& attachments) override;
         virtual void CreateRenderPass(VkRenderPass& renderPass) override;
 
-        VkFormat GetDepthFormat() { return GetAttachments()[1].format; }
+        VkFormat GetDepthFormat() { return mDepthFormat; }
 
     private:
-        VkFormat FindDepthFormat();
-
+        VkFormat mDepthFormat = VK_FORMAT_UNDEFINED;
     };
 }
 

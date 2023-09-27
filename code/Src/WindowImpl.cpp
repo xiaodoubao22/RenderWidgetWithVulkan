@@ -4,8 +4,8 @@
 namespace window {
     WindowImpl::WindowImpl(bool resizable) : WindowTemplate(resizable)
     {
-        //mRenderThread = new render::DrawTriangleThread(*this);
-        mRenderThread = new render::DrawTextureThread(*this);
+        mRenderThread = new render::DrawTriangleThread(*this);
+        //mRenderThread = new render::DrawTextureThread(*this);
     }
 
     WindowImpl::~WindowImpl() {
@@ -26,8 +26,8 @@ namespace window {
     }
 
     void WindowImpl::OnFramebufferResized(int width, int height) {
-        //static_cast<render::DrawTriangleThread*>(mRenderThread)->SetFramebufferResized();
-        static_cast<render::DrawTextureThread*>(mRenderThread)->SetFramebufferResized();
+        static_cast<render::DrawTriangleThread*>(mRenderThread)->SetFramebufferResized();
+        //static_cast<render::DrawTextureThread*>(mRenderThread)->SetFramebufferResized();
 
         if (width == 0 || height == 0) {
             if (mIsMinimized == false) {

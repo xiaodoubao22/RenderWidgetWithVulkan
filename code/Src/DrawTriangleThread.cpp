@@ -28,10 +28,8 @@ namespace render {
         0, 1, 2, 2, 3, 0
     };
 
-    DrawTriangleThread::DrawTriangleThread(window::WindowTemplate& a) : mWindow(a)
+    DrawTriangleThread::DrawTriangleThread(window::WindowTemplate& w) : RenderBase(w)
     {
-        mGraphicsDevice = new GraphicsDevice();
-        mSwapchain = new Swapchain();
         mRenderPassTest = new RenderPassTest();
         mPipelineTest = new PipelineTest();
     }
@@ -39,8 +37,6 @@ namespace render {
     DrawTriangleThread::~DrawTriangleThread() {
         delete mPipelineTest;
         delete mRenderPassTest;
-        delete mSwapchain;
-        delete mGraphicsDevice;
     }
 
     void DrawTriangleThread::SetFramebufferResized() {
@@ -49,20 +45,12 @@ namespace render {
     }
 
     void DrawTriangleThread::OnThreadInit() {
-        CheckValidationLayerSupport(setting::enableValidationLayer);
-
-        // create basic objects
-        CreateInstance();
-        DebugUtils::GetInstance().Setup(mInstance);
-        mSurface = mWindow.CreateSurface(mInstance);
-        mGraphicsDevice->Init(mInstance, mSurface);
-        mSwapchain->Init(mGraphicsDevice, mWindow.GetWindowExtent(), mSurface);
+        RenderBase::Init();
 
         // create render objects
-
         CreateSyncObjects();
         mRenderPassTest->Init(mGraphicsDevice, mSwapchain);
-        mPipelineTest->Init(mGraphicsDevice, mWindow.GetWindowExtent(), { mRenderPassTest->GetRenderPass(), 0 });
+        mPipelineTest->Init(mGraphicsDevice, mWindow.GetWindowExtent(), { mRenderPassTest->Get(), 0 });
         mCommandBuffer = mGraphicsDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
         CreateFramebuffers();
@@ -141,11 +129,7 @@ namespace render {
         CleanUpSyncObjects();
 
         // destroy basic objects
-        mSwapchain->CleanUp();
-        mGraphicsDevice->CleanUp();
-        vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
-        DebugUtils::GetInstance().Destroy(mInstance);
-        vkDestroyInstance(mInstance, nullptr);
+        RenderBase::CleanUp();
     }
 
     void DrawTriangleThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
@@ -165,7 +149,7 @@ namespace render {
         };
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = mRenderPassTest->GetRenderPass();
+        renderPassInfo.renderPass = mRenderPassTest->Get();
         renderPassInfo.framebuffer = mSwapchainFramebuffers[imageIndex];
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = mSwapchain->GetExtent();
@@ -234,7 +218,6 @@ namespace render {
     }
 
     void DrawTriangleThread::Resize() {
-        //std::cout << "recreate" << mWindow.GetWindowExtent().width << " " << mWindow.GetWindowExtent().height << std::endl;
         vkDeviceWaitIdle(mGraphicsDevice->GetDevice());
 
         CleanUpFramebuffers();
@@ -243,50 +226,6 @@ namespace render {
         mSwapchain->Recreate(mWindow.GetWindowExtent());
         CreateDepthResources();
         CreateFramebuffers();
-    }
-
-    void DrawTriangleThread::CreateInstance() {
-        // 检查需要的拓展
-        auto extensions = mWindow.QueryWindowRequiredExtensions();
-        if (mEnableValidationLayer) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-        utils::PrintStringList(extensions, "extensions:");
-        if (!CheckExtensionSupport(extensions)) {
-            throw std::runtime_error("extension not all supported!");
-        }
-        else {
-            std::cout << "extensions are all supported" << std::endl;
-        }
-
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Hello Triangle";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
-
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
-        createInfo.enabledExtensionCount = extensions.size();
-        createInfo.ppEnabledExtensionNames = extensions.data();
-        createInfo.enabledLayerCount = 0;
-        createInfo.ppEnabledLayerNames = nullptr;
-        createInfo.pNext = nullptr;
-
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if (mEnableValidationLayer) {
-            render::DebugUtils::GetInstance().PopulateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.enabledLayerCount = consts::validationLayers.size();
-            createInfo.ppEnabledLayerNames = consts::validationLayers.data();
-            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
-        }
-
-        if (vkCreateInstance(&createInfo, nullptr, &mInstance) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create instance!");
-        }
     }
 
     void DrawTriangleThread::CreateDepthResources() {
@@ -348,7 +287,7 @@ namespace render {
 
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = mRenderPassTest->GetRenderPass();
+            framebufferInfo.renderPass = mRenderPassTest->Get();
             framebufferInfo.attachmentCount = attachments.size();	// framebuffer的附件个数
             framebufferInfo.pAttachments = attachments.data();								// framebuffer的附件
             framebufferInfo.width = mSwapchain->GetExtent().width;
@@ -526,54 +465,4 @@ namespace render {
         descriptorWrites[0].pTexelBufferView = nullptr;				//  ->
         vkUpdateDescriptorSets(mGraphicsDevice->GetDevice(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
-
-    void DrawTriangleThread::CheckValidationLayerSupport(bool enableValidationLayer) {
-        if (enableValidationLayer == false) {
-            std::cout << "validation layer disabled" << std::endl;
-            mEnableValidationLayer = false;
-            return;
-        }
-
-        // 获取支持的层
-        uint32_t layerCount;
-        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-        std::vector<VkLayerProperties> availableLayers(layerCount);
-        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-        // 提取名称
-        std::vector<const char*> availableLayerNames;
-        for (VkLayerProperties& layer : availableLayers) {
-            availableLayerNames.push_back(layer.layerName);
-        }
-
-        // 检查
-        utils::PrintStringList(consts::validationLayers, "validationLayers:");
-        if (utils::CheckSupported(consts::validationLayers, availableLayerNames)) {
-            std::cout << "validation layers are all supported" << std::endl;
-            mEnableValidationLayer = true;
-        }
-        else {
-            std::cerr << "validation layer enabled but not supported" << std::endl;
-            mEnableValidationLayer = false;
-        }
-        return;
-    }
-
-    bool DrawTriangleThread::CheckExtensionSupport(const std::vector<const char*>& target) {
-        // 获取支持的拓展
-        uint32_t extensionCount = 0;
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-        std::vector<VkExtensionProperties> extensions(extensionCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-        // 提取名称
-        std::vector<const char*> supportExtensionNames;
-        for (VkExtensionProperties& extension : extensions) {
-            supportExtensionNames.push_back(extension.extensionName);
-        }
-
-        // 检查
-        return utils::CheckSupported(target, supportExtensionNames);
-    }
-
 }
