@@ -27,7 +27,7 @@ namespace render {
         // pipeline
         PipeLineConfigInfo configInfo{};
         ConfigPipelineInfo(mShaders, configInfo);
-        CreatePipeline(configInfo, renderPassInfo);
+        CreatePipeline(configInfo, renderPassInfo, mPipelineLayout, mGraphicsPipeline);
 
         // destroy shaders
         DestroyShaderModules();
@@ -63,12 +63,13 @@ namespace render {
         pipelineLayoutInfo.pSetLayouts = mDescriptorSetLayouts.size() == 0 ? nullptr : mDescriptorSetLayouts.data();
         pipelineLayoutInfo.pushConstantRangeCount = 0;
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
-        if (vkCreatePipelineLayout(GetGraphicsDevice()->GetDevice(), &pipelineLayoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS) {
+        if (vkCreatePipelineLayout(PipelineTemplate::GetDevice(), &pipelineLayoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipline layout!");
         }
     }
 
-    void PipelineTemplate::CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& rednerPassInfo) {
+    void PipelineTemplate::CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& renderPassInfo,
+        VkPipelineLayout pipelineLayout, VkPipeline& graphicsPipeline) {
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.stageCount = configInfo.shaderStageInfo.size();
@@ -81,12 +82,12 @@ namespace render {
         pipelineInfo.pDepthStencilState = &configInfo.depthStencil;
         pipelineInfo.pColorBlendState = &configInfo.colorBlending;
         pipelineInfo.pDynamicState = &configInfo.dynamicStateCreateInfo;
-        pipelineInfo.layout = mPipelineLayout;
-        pipelineInfo.renderPass = rednerPassInfo.renderPass;
-        pipelineInfo.subpass = rednerPassInfo.subPassIndex;
+        pipelineInfo.layout = pipelineLayout;
+        pipelineInfo.renderPass = renderPassInfo.renderPass;
+        pipelineInfo.subpass = renderPassInfo.subPassIndex;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;	// pipeline可以继承，减小创建管线的成本 .flags |= VK_PIPELINE_CREATE_DERIVARIVE_BIT
         pipelineInfo.basePipelineIndex = -1;
-        if (vkCreateGraphicsPipelines(mGraphicDevice->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(mGraphicDevice->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("failed to create graphics pipeline!");
         }
     }

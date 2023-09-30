@@ -54,14 +54,14 @@ namespace render {
         virtual void CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) = 0;
         virtual void ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) = 0;
         
-        
         VkShaderModule CreateShaderModule(VkDevice device, const std::vector<char>& code);
         VkExtent2D GetWindowExtent() { return mWindowExtent; };
-        GraphicsDevice* GetGraphicsDevice() { return mGraphicDevice; };
+        VkDevice GetDevice() { return mGraphicDevice->GetDevice(); }
 
-    private:
+    protected:
         void CreatePipelineLayout();
-        void CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& rednerPassInfo);
+        virtual void CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& renderPassInfo,
+            VkPipelineLayout pipelineLayout, VkPipeline& graphicsPipeline);
         void DestroyShaderModules();
 
     private:

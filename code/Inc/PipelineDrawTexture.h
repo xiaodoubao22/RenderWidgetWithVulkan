@@ -13,9 +13,11 @@ namespace render {
         virtual std::vector<VkDescriptorPoolSize> PipelineDrawTexture::GetDescriptorSize() override;
 
     private:
-        virtual void CreateShaderModules(ShaderModules& shaderModules) override;
-        virtual void CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) override;
-        virtual void ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) override;
+        void CreateShaderModules(ShaderModules& shaderModules) override;
+        void CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) override;
+        void ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) override;
+        void CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& renderPassInfo,
+            VkPipelineLayout pipelineLayout, VkPipeline& graphicsPipeline) override;
     };
 }
 

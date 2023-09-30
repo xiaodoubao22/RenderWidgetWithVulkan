@@ -43,30 +43,32 @@ namespace render {
         if (mGraphicsDevice == nullptr) {
             throw std::runtime_error("mGraphicsDevice is null");
         }
-        mGraphicsDevice->GetDevice();
+        return mGraphicsDevice->GetDevice();
     }
 
     void RenderBase::CreateInstance() {
-        // 检查需要的拓展
-        auto extensions = mWindow.QueryWindowRequiredExtensions();
-        if (mEnableValidationLayer) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-        utils::PrintStringList(extensions, "extensions:");
-        if (!CheckExtensionSupport(extensions)) {
-            throw std::runtime_error("extension not all supported!");
-        }
-        else {
-            std::cout << "extensions are all supported" << std::endl;
-        }
-
         VkApplicationInfo appInfo{};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         appInfo.pApplicationName = "Hello Triangle";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+        appInfo.apiVersion = VK_API_VERSION_1_2;
+
+        // 检查需要的拓展
+        std::cout << "--------- check extensions used by instance ----------\n";
+        auto extensions = mWindow.QueryWindowRequiredExtensions();
+        if (mEnableValidationLayer) {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+        extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        utils::PrintStringList(extensions, "enable extensions:");
+        if (!CheckExtensionSupport(extensions)) {
+            throw std::runtime_error("extension not all supported!");
+        }
+        else {
+            std::cout << "-------- instance extensions are all supported --------\n\n";
+        }
 
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -134,6 +136,7 @@ namespace render {
         for (VkExtensionProperties& extension : extensions) {
             supportExtensionNames.push_back(extension.extensionName);
         }
+        utils::PrintStringList(supportExtensionNames, "support extensions names:");
 
         // 检查
         return utils::CheckSupported(target, supportExtensionNames);

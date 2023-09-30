@@ -7,6 +7,7 @@
 #include "PipelineDrawTexture.h"
 #include "RenderPassTest.h"
 #include "RenderBase.h"
+#include "Mesh.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -97,6 +98,18 @@ namespace render {
         // descriptors
         VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
         VkDescriptorSet mDescriptorSet = VK_NULL_HANDLE;
+
+        // -------- data ------------
+        std::vector<Vertex2DColorTexture> mQuadVertices = {
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},     // 左上
+            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},      // 右上
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},       // 右下
+            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}       // 左下
+        };
+
+        const std::vector<uint16_t> mQuadIndices = {
+            0, 1, 2, 2, 3, 0
+        };
     };
 }
 

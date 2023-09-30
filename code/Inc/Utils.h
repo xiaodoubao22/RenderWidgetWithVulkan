@@ -6,6 +6,10 @@
 #include <string>
 
 namespace setting {
+    // 窗口大小
+    const int WINDOW_WIDTH = 1280;
+    const int WINDOW_HEIGHT = 960;
+
     // 验证层
 #ifdef NDEBUG
     const bool enableValidationLayer = false;
@@ -15,6 +19,7 @@ namespace setting {
 
     // 独显/核显
     const VkPhysicalDeviceType defaultDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+    //const VkPhysicalDeviceType defaultDeviceType = VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
 
     const VkSurfaceFormatKHR swapchainSurfaceFormat = {
         VK_FORMAT_B8G8R8A8_SRGB,
@@ -37,7 +42,8 @@ namespace consts {
     };
 
     const std::vector<const char*> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME
     };
 
     const VkClearValue CLEAR_COLOR_NAVY_FLT = { 0.2f, 0.3f, 0.3f, 1.0f };

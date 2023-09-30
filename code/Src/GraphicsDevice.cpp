@@ -7,16 +7,20 @@
 #include <set>
 #include <unordered_set>
 #include <iostream>
-
-const std::vector<const char*> validationLayers = {
-	"VK_LAYER_KHRONOS_validation"
-};
-
-const std::vector<const char*> deviceExtensions = {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
+#include <bitset>
 
 namespace render {
+	VkResult GetPhysicalDeviceFragmentShadingRatesKHR(VkInstance instance, VkPhysicalDevice physicalDevice,
+		uint32_t* pFragmentShadingRateCount, VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates) {
+		auto func = (PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFragmentShadingRatesKHR");
+		if (func != nullptr) {
+			return func(physicalDevice, pFragmentShadingRateCount, pFragmentShadingRates);
+		}
+		else {
+			return VK_ERROR_EXTENSION_NOT_PRESENT;
+		}
+	}
+
     GraphicsDevice::GraphicsDevice() {
 
     }
@@ -293,32 +297,88 @@ namespace render {
 		}
 		std::vector<VkPhysicalDevice> devices(deviceCount);
 		vkEnumeratePhysicalDevices(mInstance, &deviceCount, devices.data());
-
-		// 候选设备map <score, device>
-		std::multimap<int, VkPhysicalDevice> candidates;
-		for (const auto& device : devices) {
-			// 判分
-			int score = RateDeviceSuitability(device);
-			candidates.insert(std::make_pair(score, device));
+		
+		// 选择符合要求的设备
+		mPhysicalDevice = VK_NULL_HANDLE;
+		for (const auto& candidateDevice : devices) {
+			if (IsDeviceSuatiable(candidateDevice)) {
+				mPhysicalDevice = candidateDevice;
+				break;
+			}
 		}
-
-		// 选得分最高的设备
-		if (candidates.rbegin()->first > 0) {
-			mPhysicalDevice = candidates.rbegin()->second;
-		}
-		else {
+		
+		if (mPhysicalDevice == VK_NULL_HANDLE) {
 			throw std::runtime_error("failed to find a suitable GPU!");
 		}
-
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProperties);
-		std::cout << "choose device: " << deviceProperties.deviceName << std::endl;
+
+		// 输出选择结果
+		std::cout << "--------------- pick GPU success ---------------\n";
+		std::cout << "device name: " << deviceProperties.deviceName << std::endl;
+		utils::PrintStringList(consts::deviceExtensions, "enable device extensions:");
+
+		uint32_t extensionCount;
+		vkEnumerateDeviceExtensionProperties(mPhysicalDevice, nullptr, &extensionCount, nullptr);
+		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+		vkEnumerateDeviceExtensionProperties(mPhysicalDevice, nullptr, &extensionCount, availableExtensions.data());
+		std::vector<const char*> availableExtensionsNames;
+		for (VkExtensionProperties& extension : availableExtensions) {
+			availableExtensionsNames.push_back(extension.extensionName);
+		}
+		utils::PrintStringList(availableExtensionsNames, "availiable device extensions:");
+		std::cout << "------------------------------------------------\n\n";
+
+		// ******************查询VRS特性，TODO 移到选择GPU的逻辑中 *******************
+		// feature
+		VkPhysicalDeviceFragmentShadingRateFeaturesKHR physicalDeviceFSRFeatures{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR 
+		};
+		VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
+		physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		physicalDeviceFeatures2.pNext = &physicalDeviceFSRFeatures;
+		vkGetPhysicalDeviceFeatures2(mPhysicalDevice, &physicalDeviceFeatures2);
+
+		std::cout << "physicalDeviceFSRFeatures : " 
+			<< physicalDeviceFSRFeatures.attachmentFragmentShadingRate << " "
+			<< physicalDeviceFSRFeatures.pipelineFragmentShadingRate << " "
+			<< physicalDeviceFSRFeatures.primitiveFragmentShadingRate << std::endl;
+
+		// properties
+		VkPhysicalDeviceFragmentShadingRatePropertiesKHR physicalDeviceFSRProperties{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_PROPERTIES_KHR
+		};
+		VkPhysicalDeviceProperties2 physicalDeviceProperties2{};
+		physicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		physicalDeviceProperties2.pNext = &physicalDeviceFSRProperties;
+		vkGetPhysicalDeviceProperties2(mPhysicalDevice, &physicalDeviceProperties2);
+		std::cout << "physicalDeviceFSRProperties : "
+			<< "(" << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width << ", "
+			<< physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height << ") "
+			<< "(" << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width << ", "
+			<< physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height << ") "
+			<< "(" << physicalDeviceFSRProperties.maxFragmentSizeAspectRatio << ")\n";
+
+		// availiable shading rate
+		uint32_t availiableShadingRateSize = 0;
+		std::vector<VkPhysicalDeviceFragmentShadingRateKHR> availiableShadingRate(0);
+		VkResult res = GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, mPhysicalDevice, &availiableShadingRateSize, nullptr);
+		if (availiableShadingRateSize != 0 && res == VK_SUCCESS) {
+			availiableShadingRate.resize(availiableShadingRateSize, { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR });
+			GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, mPhysicalDevice, &availiableShadingRateSize, availiableShadingRate.data());
+		}
+		
+		for (VkPhysicalDeviceFragmentShadingRateKHR& shadingRate : availiableShadingRate) {
+			std::cout << std::bitset<sizeof(VkSampleCountFlags) * 8>(shadingRate.sampleCounts)
+				<< " (" << shadingRate.fragmentSize.width << "," << shadingRate.fragmentSize.height << ")" << std::endl;
+		}
+		// **********************************************************************
 	}
 
 	void GraphicsDevice::CreateLogicalDevice() {
 		// ------ fill queueCreateInfo -------
 		mQueueFamilyIndices = FindQueueFamilies(mPhysicalDevice);
-
+ 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		std::set<uint32_t> uniqueQueueFamilies = {
 			mQueueFamilyIndices.graphicsFamily.value(),
@@ -353,6 +413,15 @@ namespace render {
 		else {
 			createInfo.enabledLayerCount = 0;
 		}
+
+		VkPhysicalDeviceFragmentShadingRateFeaturesKHR shadingRateCreateInfo{};
+		shadingRateCreateInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
+		shadingRateCreateInfo.pipelineFragmentShadingRate = true;
+		shadingRateCreateInfo.attachmentFragmentShadingRate = false;
+		shadingRateCreateInfo.primitiveFragmentShadingRate = false;
+
+		createInfo.pNext = &shadingRateCreateInfo;
+
 		if (vkCreateDevice(mPhysicalDevice, &createInfo, nullptr, &mDevice) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create logical device!");
 		}
@@ -360,7 +429,6 @@ namespace render {
 		// 从逻辑设备中取出图形队列（根据队列族编号）
 		vkGetDeviceQueue(mDevice, mQueueFamilyIndices.graphicsFamily.value(), 0, &mGraphicsQueue);
 		vkGetDeviceQueue(mDevice, mQueueFamilyIndices.presentFamily.value(), 0, &mPresentQueue);
-
 	}
 
 	void GraphicsDevice::CreateCommandPool() {
@@ -401,6 +469,45 @@ namespace render {
 		return score;
 	}
 
+	bool GraphicsDevice::IsDeviceSuatiable(VkPhysicalDevice device) {
+		VkPhysicalDeviceProperties deviceProperties;	// name, type, supported Vulkan version
+		vkGetPhysicalDeviceProperties(device, &deviceProperties);
+		std::cout << deviceProperties.deviceName;
+
+		// 显卡类型要求
+		if (setting::defaultDeviceType != VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM &&	// 等于MAX_ENUM视为无要求
+			setting::defaultDeviceType != deviceProperties.deviceType) {
+			std::cout <<" type not suatiable \n";
+			return false;
+		}
+
+		// 队列种类不够，不能用
+		QueueFamilyIndices indices = FindQueueFamilies(device);
+		if (!indices.IsComplete()) {
+			std::cout << " queue family not suatiable \n";
+			return false;
+		}
+
+		// 拓展是否支持
+		uint32_t extensionCount;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+		std::vector<const char*> availableExtensionsNames;
+		for (VkExtensionProperties& extension : availableExtensions) {
+			availableExtensionsNames.push_back(extension.extensionName);
+		}
+
+		if (!utils::CheckSupported(consts::deviceExtensions, availableExtensionsNames)) {
+			std::cout << " extension not suatiable \n";
+			return false;
+		}
+
+		std::cout << " suatiable \n";
+		return true;
+	}
+
 	QueueFamilyIndices GraphicsDevice::FindQueueFamilies(VkPhysicalDevice device) {
 		QueueFamilyIndices indices{};
 
@@ -428,6 +535,19 @@ namespace render {
 		}
 
 		return indices;
+	}
+
+	void GraphicsDevice::GetAvailiableExtensionsNames(VkPhysicalDevice device, std::vector<const char*>& extensionsNames) {
+		uint32_t extensionCount;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+		extensionsNames.clear();
+		for (VkExtensionProperties& extension : availableExtensions) {
+			extensionsNames.push_back(extension.extensionName);
+		}
+
 	}
 }
 

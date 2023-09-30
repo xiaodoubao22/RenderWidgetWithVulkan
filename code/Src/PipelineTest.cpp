@@ -29,8 +29,8 @@ namespace render {
 		auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTriangleTestFrag.spv"));
 
         // 创建
-        shaderModules.vertexShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), vertShaderCode);
-        shaderModules.fragmentShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), fragShaderCode);
+        shaderModules.vertexShader = CreateShaderModule(PipelineTemplate::GetDevice(), vertShaderCode);
+        shaderModules.fragmentShader = CreateShaderModule(PipelineTemplate::GetDevice(), fragShaderCode);
         return;
     }
 
@@ -50,7 +50,7 @@ namespace render {
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		layoutInfo.bindingCount = layoutBindings.size();
 		layoutInfo.pBindings = layoutBindings.data();
-		if (vkCreateDescriptorSetLayout(GetGraphicsDevice()->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
+		if (vkCreateDescriptorSetLayout(PipelineTemplate::GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor set layout!");
 		}
 	}

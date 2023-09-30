@@ -7,6 +7,7 @@
 #include "PipelineTest.h"
 #include "RenderPassTest.h"
 #include "RenderBase.h"
+#include "Mesh.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -97,6 +98,24 @@ namespace render {
 
         VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
         VkDescriptorSet mDescriptorSet = VK_NULL_HANDLE;
+
+        // data
+        struct UboMvpMatrix {
+            glm::mat4 model;
+            glm::mat4 view;
+            glm::mat4 proj;
+        };
+
+        std::vector<Vertex2DColor> mTriangleVertices = {
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+        };
+
+        const std::vector<uint16_t> mTriangleIndices = {
+            0, 1, 2, 2, 3, 0
+        };
 
     };
 }

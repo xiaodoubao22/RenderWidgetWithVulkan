@@ -3,7 +3,6 @@
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
-#include "Mesh.h"
 
 #include <chrono>
 #include <iostream>
@@ -11,23 +10,6 @@
 #include <array>
 
 namespace render {
-    struct UboMvpMatrix {
-        glm::mat4 model;
-        glm::mat4 view;
-        glm::mat4 proj;
-    };
-
-    std::vector<Vertex2DColor> gTriangleVertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
-    };
-
-    const std::vector<uint16_t> gTriangleIndices = {
-        0, 1, 2, 2, 3, 0
-    };
-
     DrawTriangleThread::DrawTriangleThread(window::WindowTemplate& w) : RenderBase(w)
     {
         mRenderPassTest = new RenderPassTest();
@@ -187,7 +169,7 @@ namespace render {
             0, nullptr);
 
         //画图
-        vkCmdDrawIndexed(commandBuffer, gTriangleIndices.size(), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, mTriangleIndices.size(), 1, 0, 0, 0);
         //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
 
         // 结束Pass
@@ -329,7 +311,7 @@ namespace render {
     }
 
     void DrawTriangleThread::CreateVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(gTriangleVertices[0]) * gTriangleVertices.size();
+        VkDeviceSize bufferSize = sizeof(mTriangleVertices[0]) * mTriangleVertices.size();
 
         // 创建临时缓冲
         VkBuffer stagingBuffer;
@@ -342,7 +324,7 @@ namespace render {
         // 数据拷贝到临时缓冲
         void* data;
         vkMapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, gTriangleVertices.data(), (size_t)bufferSize);
+        memcpy(data,mTriangleVertices.data(), (size_t)bufferSize);
         vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
 
         // 创建 mVertexBuffer
@@ -366,7 +348,7 @@ namespace render {
     }
 
     void DrawTriangleThread::CreateIndexBuffer() {
-        VkDeviceSize bufferSize = sizeof(gTriangleIndices[0]) * gTriangleIndices.size();
+        VkDeviceSize bufferSize = sizeof(mTriangleIndices[0]) * mTriangleIndices.size();
 
         // 创建临时缓冲
         VkBuffer stagingBuffer;
@@ -379,7 +361,7 @@ namespace render {
         // 数据拷贝到临时缓冲
         void* data;
         vkMapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, gTriangleIndices.data(), (size_t)bufferSize);
+        memcpy(data, mTriangleIndices.data(), (size_t)bufferSize);
         vkUnmapMemory(mGraphicsDevice->GetDevice(), stagingBufferMemory);
 
         // 创建索引缓冲

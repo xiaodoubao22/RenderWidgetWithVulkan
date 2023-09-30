@@ -27,18 +27,18 @@ namespace utils {
 	void PrintStringList(const std::vector<std::string>& stringList, const std::string& head) {
 		std::cout << head << std::endl;
 		for (int i = 0; i < stringList.size(); i++) {
-			std::cout << "  -" << stringList[i] << std::endl;
+			std::cout << "  - " << stringList[i] << std::endl;
 		}
-		std::cout << "end\n";
+		std::cout << "  - end\n";
 		return;
 	}
 
 	void PrintStringList(const std::vector<const char*>& stringList, const std::string& head) {
 		std::cout << head << std::endl;
 		for (int i = 0; i < stringList.size(); i++) {
-			std::cout << "  -" << stringList[i] << std::endl;
+			std::cout << "  - " << stringList[i] << std::endl;
 		}
-		std::cout << "end\n";
+		std::cout << "  - end\n";
 		return;
 	}
 

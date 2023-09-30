@@ -29,8 +29,8 @@ namespace render {
 		auto fragShaderCode = utils::ReadFile(setting::dirSpvFiles + std::string("DrawTextureTestFrag.spv"));
 
 		// 创建
-		shaderModules.vertexShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), vertShaderCode);
-		shaderModules.fragmentShader = CreateShaderModule(GetGraphicsDevice()->GetDevice(), fragShaderCode);
+		shaderModules.vertexShader = CreateShaderModule(PipelineTemplate::GetDevice(), vertShaderCode);
+		shaderModules.fragmentShader = CreateShaderModule(PipelineTemplate::GetDevice(), fragShaderCode);
 		return;
 	}
 
@@ -50,7 +50,7 @@ namespace render {
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		layoutInfo.bindingCount = layoutBindings.size();
 		layoutInfo.pBindings = layoutBindings.data();
-		if (vkCreateDescriptorSetLayout(GetGraphicsDevice()->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
+		if (vkCreateDescriptorSetLayout(PipelineTemplate::GetDevice(), &layoutInfo, nullptr, &descriptorSetLayouts[0]) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor set layout!");
 		}
 	}
@@ -166,11 +166,42 @@ namespace render {
 		configInfo.dynamicStates = {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
-			VK_DYNAMIC_STATE_LINE_WIDTH
+			VK_DYNAMIC_STATE_LINE_WIDTH,
 		};
 		configInfo.dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 		configInfo.dynamicStateCreateInfo.dynamicStateCount = configInfo.dynamicStates.size();
 		configInfo.dynamicStateCreateInfo.pDynamicStates = configInfo.dynamicStates.data();
 		return;
+	}
+
+	void PipelineDrawTexture::CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& renderPassInfo,
+		VkPipelineLayout pipelineLayout, VkPipeline& graphicsPipeline) {
+		VkPipelineFragmentShadingRateStateCreateInfoKHR shadingRateCreateInfo{};
+		shadingRateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_FRAGMENT_SHADING_RATE_STATE_CREATE_INFO_KHR;
+		shadingRateCreateInfo.fragmentSize = { 4, 4 };
+		shadingRateCreateInfo.combinerOps[0] = VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR;
+		shadingRateCreateInfo.combinerOps[1] = VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR;
+
+		VkGraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineInfo.stageCount = configInfo.shaderStageInfo.size();
+		pipelineInfo.pStages = configInfo.shaderStageInfo.data();
+		pipelineInfo.pVertexInputState = &configInfo.vertexInputInfo;	// fill all of the stage
+		pipelineInfo.pInputAssemblyState = &configInfo.inputAssembly;
+		pipelineInfo.pViewportState = &configInfo.viewportState;
+		pipelineInfo.pRasterizationState = &configInfo.rasterizer;
+		pipelineInfo.pMultisampleState = &configInfo.multisampling;
+		pipelineInfo.pDepthStencilState = &configInfo.depthStencil;
+		pipelineInfo.pColorBlendState = &configInfo.colorBlending;
+		pipelineInfo.pDynamicState = &configInfo.dynamicStateCreateInfo;
+		pipelineInfo.layout = pipelineLayout;
+		pipelineInfo.renderPass = renderPassInfo.renderPass;
+		pipelineInfo.subpass = renderPassInfo.subPassIndex;
+		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;	// pipeline可以继承，减小创建管线的成本 .flags |= VK_PIPELINE_CREATE_DERIVARIVE_BIT
+		pipelineInfo.basePipelineIndex = -1;
+		pipelineInfo.pNext = &shadingRateCreateInfo;
+		if (vkCreateGraphicsPipelines(PipelineTemplate::GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create graphics pipeline!");
+		}
 	}
 }

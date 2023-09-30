@@ -1,18 +1,15 @@
 #include "WindowTemplate.h"
 #include <stdexcept>
 #include <iostream>
+#include "Utils.h"
 
 namespace window {
-
-    const int WIDTH = 800;
-    const int HEIGHT = 800;
-
     WindowTemplate::WindowTemplate(bool resizable) {
         // 初始化GLFW窗口
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);	// 不要创建OpenGL上下文
         glfwWindowHint(GLFW_RESIZABLE, resizable);		// 禁止调整窗口大小
-        mWindow = glfwCreateWindow(WIDTH, HEIGHT, "render widget", nullptr, nullptr);
+        mWindow = glfwCreateWindow(setting::WINDOW_WIDTH, setting::WINDOW_HEIGHT, "render widget", nullptr, nullptr);
         glfwSetWindowUserPointer(mWindow, this);
         glfwSetFramebufferSizeCallback(mWindow, FramebufferSizeCallback);
         glfwSetWindowSizeLimits(mWindow, 200, 200, GLFW_DONT_CARE, GLFW_DONT_CARE);

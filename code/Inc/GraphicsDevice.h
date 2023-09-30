@@ -66,7 +66,9 @@ namespace render {
 
         // tool functions
         int RateDeviceSuitability(VkPhysicalDevice device);
+        bool IsDeviceSuatiable(VkPhysicalDevice device);
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
+        void GetAvailiableExtensionsNames(VkPhysicalDevice device, std::vector<const char*>& extensionsNames);
 
     private:
         bool mIsInitialized = false;

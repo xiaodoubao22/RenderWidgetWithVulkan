@@ -2,7 +2,6 @@
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
-#include "Mesh.h"
 
 #include <chrono>
 #include <iostream>
@@ -13,17 +12,6 @@
 #include <stb_image.h>
 
 namespace render {
-    std::vector<Vertex2DColorTexture> gQuadVertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},     // 左上
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},      // 右上
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},       // 右下
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}       // 左下
-    };
-
-    const std::vector<uint16_t> gQuadIndices = {
-        0, 1, 2, 2, 3, 0
-    };
-
     DrawTextureThread::DrawTextureThread(window::WindowTemplate& w) : RenderBase(w)
     {
         mRenderPassTest = new RenderPassTest();
@@ -42,7 +30,7 @@ namespace render {
 
     void DrawTextureThread::OnThreadInit() {
         RenderBase::Init();
-
+        
         // create render objects
         CreateSyncObjects();
         mRenderPassTest->Init(RenderBase::mGraphicsDevice, RenderBase::mSwapchain);
@@ -187,7 +175,7 @@ namespace render {
             0, nullptr);
 
         //画图
-        vkCmdDrawIndexed(commandBuffer, gQuadIndices.size(), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, mQuadIndices.size(), 1, 0, 0, 0);
         //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
 
         // 结束Pass
@@ -292,11 +280,9 @@ namespace render {
     void DrawTextureThread::CreateSyncObjects() {
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;		//（初始化解锁）
-
         if (vkCreateSemaphore(RenderBase::GetDevice(), &semaphoreInfo, nullptr, &mImageAvailableSemaphore) != VK_SUCCESS ||
             vkCreateSemaphore(RenderBase::GetDevice(), &semaphoreInfo, nullptr, &mRenderFinishedSemaphore) != VK_SUCCESS ||
             vkCreateFence(RenderBase::GetDevice(), &fenceInfo, nullptr, &mInFlightFence) != VK_SUCCESS) {
@@ -311,7 +297,7 @@ namespace render {
     }
 
     void DrawTextureThread::CreateVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(gQuadVertices[0]) * gQuadVertices.size();
+        VkDeviceSize bufferSize = sizeof(mQuadVertices[0]) * mQuadVertices.size();
 
         // 创建临时缓冲
         VkBuffer stagingBuffer;
@@ -324,7 +310,7 @@ namespace render {
         // 数据拷贝到临时缓冲
         void* data;
         vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, gQuadVertices.data(), (size_t)bufferSize);
+        memcpy(data, mQuadVertices.data(), (size_t)bufferSize);
         vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建 mVertexBuffer
@@ -348,7 +334,7 @@ namespace render {
     }
 
     void DrawTextureThread::CreateIndexBuffer() {
-        VkDeviceSize bufferSize = sizeof(gQuadIndices[0]) * gQuadIndices.size();
+        VkDeviceSize bufferSize = sizeof(mQuadIndices[0]) * mQuadIndices.size();
 
         // 创建临时缓冲
         VkBuffer stagingBuffer;
@@ -361,7 +347,7 @@ namespace render {
         // 数据拷贝到临时缓冲
         void* data;
         vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, gQuadIndices.data(), (size_t)bufferSize);
+        memcpy(data, mQuadIndices.data(), (size_t)bufferSize);
         vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建索引缓冲
