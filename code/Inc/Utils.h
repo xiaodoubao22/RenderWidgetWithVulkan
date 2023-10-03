@@ -38,12 +38,12 @@ namespace setting {
 
 namespace consts {
     const std::vector<const char*> validationLayers = {
-        "VK_LAYER_KHRONOS_validation"
+        "VK_LAYER_KHRONOS_validation",
     };
 
     const std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME
+        VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
     };
 
     const VkClearValue CLEAR_COLOR_NAVY_FLT = { 0.2f, 0.3f, 0.3f, 1.0f };

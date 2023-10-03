@@ -12,7 +12,7 @@ namespace render {
 		attachments.resize(2);
 
 		// 查找合适的深度缓冲格式
-		mDepthFormat = GetGraphicsDevice()->FindSupportedFormat(
+		mDepthFormat = GetPhisicalDevice()->FindSupportedFormat(
 			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
@@ -76,7 +76,7 @@ namespace render {
 		renderPassInfo.dependencyCount = dependencys.size();
 		renderPassInfo.pDependencies = dependencys.data();
 
-		if (vkCreateRenderPass(GetGraphicsDevice()->GetDevice(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+		if (vkCreateRenderPass(GetDevice()->Get(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create render pass!");
 		}
     }

@@ -33,10 +33,10 @@ namespace render {
         
         // create render objects
         CreateSyncObjects();
-        mRenderPassTest->Init(RenderBase::mGraphicsDevice, RenderBase::mSwapchain);
-        mPipelineDrawTexture->Init(RenderBase::mGraphicsDevice, RenderBase::mWindow.GetWindowExtent(),
+        mRenderPassTest->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
+        mPipelineDrawTexture->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(),
             { mRenderPassTest->Get(), 0 });
-        mCommandBuffer = RenderBase::mGraphicsDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+        mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
         CreateFramebuffers();
         CreateVertexBuffer();
@@ -80,7 +80,7 @@ namespace render {
         submitInfo.signalSemaphoreCount = renderFinishedSemaphore.size();
         submitInfo.pSignalSemaphores = renderFinishedSemaphore.data();    // 指定命令执行完触发mRenderFinishedSemaphore，意思是等我画完再返回交换链
         // 把命令提交到图形队列中，第三个参数指定命令执行完毕后触发mInFlightFence，告诉CPU当前帧画完可以画下一帧了（解锁）
-        if (vkQueueSubmit(RenderBase::mGraphicsDevice->GetGraphicsQueue(), 1, &submitInfo, mInFlightFence) != VK_SUCCESS) {
+        if (vkQueueSubmit(RenderBase::mDevice->GetGraphicsQueue(), 1, &submitInfo, mInFlightFence) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
 
@@ -97,7 +97,6 @@ namespace render {
                 Resize();
             }
         }
-        
     }
 
     void DrawTextureThread::OnThreadDestroy() {
@@ -111,7 +110,7 @@ namespace render {
         CleanUpVertexBuffer();
         CleanUpFramebuffers();
         CleanUpDepthResources();
-        RenderBase::mGraphicsDevice->FreeCommandBuffer(mCommandBuffer);
+        RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
         mPipelineDrawTexture->CleanUp();
         mRenderPassTest->CleanUp();
         CleanUpSyncObjects();
@@ -119,6 +118,11 @@ namespace render {
         // destroy basic objects
         RenderBase::CleanUp();
     }
+
+    //bool DrawTextureThread::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
+    //    std::cout << "DrawTextureThread::PhysicalDeviceSelectionCondition" << std::endl;
+    //    return true;
+    //}
 
     void DrawTextureThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
         // 开始写入
@@ -215,7 +219,7 @@ namespace render {
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.flags = 0;	// 可选标志，例如3D纹理中避免体素中的空气值
-        mGraphicsDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDepthImage, mDepthImageMemory);
+        RenderBase::mDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDepthImage, mDepthImageMemory);
 
         // imageView
         VkImageViewCreateInfo viewInfo{};
@@ -302,7 +306,7 @@ namespace render {
         // 创建临时缓冲
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        mGraphicsDevice->CreateBuffer(bufferSize,
+        RenderBase::mDevice->CreateBuffer(bufferSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,		// 用途：transfer src
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             stagingBuffer, stagingBufferMemory);
@@ -314,13 +318,13 @@ namespace render {
         vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建 mVertexBuffer
-        mGraphicsDevice->CreateBuffer(bufferSize,
+        RenderBase::mDevice->CreateBuffer(bufferSize,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,	// 用途：transfer src + 顶点缓冲
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             mVertexBuffer, mVertexBufferMemory);
 
         // 复制 stagingBuffer -> mVertexBuffer
-        mGraphicsDevice->CopyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
+        RenderBase::mDevice->CopyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
 
         // 清理临时缓冲
         vkDestroyBuffer(RenderBase::GetDevice(), stagingBuffer, nullptr);
@@ -339,7 +343,7 @@ namespace render {
         // 创建临时缓冲
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        mGraphicsDevice->CreateBuffer(bufferSize,
+        RenderBase::mDevice->CreateBuffer(bufferSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             stagingBuffer, stagingBufferMemory);
@@ -351,13 +355,13 @@ namespace render {
         vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建索引缓冲
-        mGraphicsDevice->CreateBuffer(bufferSize,
+        RenderBase::mDevice->CreateBuffer(bufferSize,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             mIndexBuffer, mIndexBufferMemory);
 
         // 复制 stagingBuffer -> mIndexBuffer
-        mGraphicsDevice->CopyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
+        RenderBase::mDevice->CopyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
 
         // 清理临时缓冲
         vkDestroyBuffer(RenderBase::GetDevice(), stagingBuffer, nullptr);
@@ -383,7 +387,7 @@ namespace render {
         // 创建临时缓冲
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        mGraphicsDevice->CreateBuffer(imageSize,
+        RenderBase::mDevice->CreateBuffer(imageSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             stagingBuffer, stagingBufferMemory);
@@ -411,21 +415,21 @@ namespace render {
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.flags = 0; // Optional
-        mGraphicsDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        RenderBase::mDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             mTestTextureImage, mTestTextureImageMemory);
 
         // 转换image格式，undefined -> transferDst
-        ImageMemoryBarrierInfo imageBarrierInfo{};
+        Device::ImageMemoryBarrierInfo imageBarrierInfo{};
         imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         imageBarrierInfo.srcAccessMask = 0;
         imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         imageBarrierInfo.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        mGraphicsDevice->TransitionImageLayout(mTestTextureImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+        RenderBase::mDevice->TransitionImageLayout(mTestTextureImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
         // 拷贝数据，从buffer到image
-        mGraphicsDevice->CopyBufferToImage(stagingBuffer, mTestTextureImage, texWidth, texHeight);
+        RenderBase::mDevice->CopyBufferToImage(stagingBuffer, mTestTextureImage, texWidth, texHeight);
 
         // 转换image格式，transferDst -> shaderReadOnly
         imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -434,7 +438,7 @@ namespace render {
         imageBarrierInfo.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        mGraphicsDevice->TransitionImageLayout(mTestTextureImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+        RenderBase::mDevice->TransitionImageLayout(mTestTextureImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
         // 清理临时缓冲
         vkDestroyBuffer(RenderBase::GetDevice(), stagingBuffer, nullptr);

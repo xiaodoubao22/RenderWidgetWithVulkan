@@ -2,7 +2,6 @@
 #define __RENDER_PASS_H__
 
 #include <vulkan/vulkan.h>
-#include "GraphicsDevice.h"
 #include "SwapChain.h"
 
 namespace render {
@@ -11,7 +10,7 @@ namespace render {
         RenderPassTemplate();
         virtual ~RenderPassTemplate();
 
-        void Init(GraphicsDevice* graphicsDevice, Swapchain* swapchain);
+        void Init(PhysicalDevice* physicalDevice, Device* device, Swapchain* swapchain);
         void CleanUp();
 
         VkRenderPass Get() { return mRenderPass; }
@@ -21,12 +20,14 @@ namespace render {
         virtual void FillAttachmentDescriptions(std::vector<VkAttachmentDescription>& attachments) = 0;
         virtual void CreateRenderPass(VkRenderPass& renderPass) = 0;
 
-        GraphicsDevice* GetGraphicsDevice() { return mGraphicsDevice; }
+        PhysicalDevice* GetPhisicalDevice() { return mPhysicalDevice; }
+        Device* GetDevice() { return mDevice; }
         Swapchain* GetSwapchain() { return mSwapchain; }
 
     private:
         // externel objects
-        GraphicsDevice* mGraphicsDevice = nullptr;
+        PhysicalDevice* mPhysicalDevice = nullptr;
+        Device* mDevice = nullptr;
         Swapchain* mSwapchain = nullptr;
 
         // renderpass

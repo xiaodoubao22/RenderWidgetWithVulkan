@@ -2,8 +2,6 @@
 #define __DRAW_TEXTURE_THREAD__
 
 #include "Thread.h"
-#include "GraphicsDevice.h"
-#include "Swapchain.h"
 #include "PipelineDrawTexture.h"
 #include "RenderPassTest.h"
 #include "RenderBase.h"
@@ -29,8 +27,10 @@ namespace render {
         virtual void OnThreadLoop() override;
         virtual void OnThreadDestroy() override;
 
+        //bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) override;
+
     private:
-        // ----- rener functions -----
+        // ----- render functions -----
         void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
         void Resize();
 

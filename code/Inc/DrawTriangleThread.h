@@ -2,8 +2,6 @@
 #define __DRAW_TRIANGLE_THREAD_H__
 
 #include "Thread.h"
-#include "GraphicsDevice.h"
-#include "Swapchain.h"
 #include "PipelineTest.h"
 #include "RenderPassTest.h"
 #include "RenderBase.h"

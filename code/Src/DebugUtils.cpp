@@ -20,7 +20,7 @@ namespace render {
 	}
 
 	void DebugUtils::Setup(VkInstance instance) {
-		if (mIsSetup || !setting::enableValidationLayer) {
+		if (mIsSetup) {
 			return;
 		}
 
@@ -46,7 +46,7 @@ namespace render {
 	}
 
 	void DebugUtils::Destroy(VkInstance instance) {
-		if (!mIsSetup || !setting::enableValidationLayer) {
+		if (!mIsSetup) {
 			return;
 		}
 

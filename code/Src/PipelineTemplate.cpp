@@ -10,9 +10,9 @@ namespace render {
 
     }
 
-    void PipelineTemplate::Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, const RenderPassInfo& renderPassInfo) {
+    void PipelineTemplate::Init(Device* Device, VkExtent2D windowExtent, const RenderPassInfo& renderPassInfo) {
         // set externel objects
-        mGraphicDevice = graphicsDevice;
+        mDevice = Device;
         mWindowExtent = windowExtent;
 
         // shaders
@@ -34,12 +34,12 @@ namespace render {
     }
 
     void PipelineTemplate::CleanUp() {
-        vkDestroyPipeline(mGraphicDevice->GetDevice(), mGraphicsPipeline, nullptr);
+        vkDestroyPipeline(mDevice->Get(), mGraphicsPipeline, nullptr);
 
-        vkDestroyPipelineLayout(mGraphicDevice->GetDevice(), mPipelineLayout, nullptr);
+        vkDestroyPipelineLayout(mDevice->Get(), mPipelineLayout, nullptr);
         
         for (auto setLayout : mDescriptorSetLayouts) {
-            vkDestroyDescriptorSetLayout(mGraphicDevice->GetDevice(), setLayout, nullptr);
+            vkDestroyDescriptorSetLayout(mDevice->Get(), setLayout, nullptr);
         }
     }
 
@@ -87,18 +87,18 @@ namespace render {
         pipelineInfo.subpass = renderPassInfo.subPassIndex;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;	// pipeline可以继承，减小创建管线的成本 .flags |= VK_PIPELINE_CREATE_DERIVARIVE_BIT
         pipelineInfo.basePipelineIndex = -1;
-        if (vkCreateGraphicsPipelines(mGraphicDevice->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(mDevice->Get(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("failed to create graphics pipeline!");
         }
     }
 
     void PipelineTemplate::DestroyShaderModules() {
         if (mShaders.vertexShader != VK_NULL_HANDLE) {
-            vkDestroyShaderModule(mGraphicDevice->GetDevice(), mShaders.vertexShader, nullptr);
+            vkDestroyShaderModule(mDevice->Get(), mShaders.vertexShader, nullptr);
         }
         
         if (mShaders.fragmentShader != VK_NULL_HANDLE) {
-            vkDestroyShaderModule(mGraphicDevice->GetDevice(), mShaders.fragmentShader, nullptr);
+            vkDestroyShaderModule(mDevice->Get(), mShaders.fragmentShader, nullptr);
         }
     }
 

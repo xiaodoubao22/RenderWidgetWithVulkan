@@ -4,7 +4,8 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
-#include "GraphicsDevice.h"
+//#include "GraphicsDevice.h"
+#include "Device.h"
 
 namespace render {
     struct ShaderModules {
@@ -40,7 +41,7 @@ namespace render {
         PipelineTemplate();
         virtual ~PipelineTemplate();
 
-        void Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, const RenderPassInfo& renderPassInfo);
+        void Init(Device* Device, VkExtent2D windowExtent, const RenderPassInfo& renderPassInfo);
         void CleanUp();
 
         VkPipeline GetPipeline() { return mGraphicsPipeline; }
@@ -56,7 +57,7 @@ namespace render {
         
         VkShaderModule CreateShaderModule(VkDevice device, const std::vector<char>& code);
         VkExtent2D GetWindowExtent() { return mWindowExtent; };
-        VkDevice GetDevice() { return mGraphicDevice->GetDevice(); }
+        VkDevice GetDevice() { return mDevice->Get(); }
 
     protected:
         void CreatePipelineLayout();
@@ -65,7 +66,7 @@ namespace render {
         void DestroyShaderModules();
 
     private:
-        GraphicsDevice* mGraphicDevice = VK_NULL_HANDLE;
+        Device* mDevice = VK_NULL_HANDLE;
         VkExtent2D mWindowExtent = {};
 
         ShaderModules mShaders = {};

@@ -15,13 +15,20 @@ namespace render {
 
     }
 
-    bool Swapchain::Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, VkSurfaceKHR surface) {
+    bool Swapchain::Init(PhysicalDevice* physicalDevice, Device* device, VkExtent2D windowExtent, VkSurfaceKHR surface) {
+		if (physicalDevice == nullptr || 
+			device == nullptr || 
+			!physicalDevice->IsValid() ||
+			!device->IsValid()) {
+			throw std::runtime_error("can not init swapchain with null/invalid physicalDevice/device !");
+		}
 		if (mIsInitialized) {
 			return false;
 		}
-
+		
 		// set properties
-		mGraphicsDevice = graphicsDevice;
+		mPhysicalDevice = physicalDevice;
+		mDevice = device;
 		mSurface = surface;
 
 		// create
@@ -39,10 +46,11 @@ namespace render {
 
 		// destroy
 		DestroyImageViews();
-		vkDestroySwapchainKHR(mGraphicsDevice->GetDevice(), mSwapChain, nullptr);
+		vkDestroySwapchainKHR(mDevice->Get(), mSwapChain, nullptr);
 
 		// clear properties
-		mGraphicsDevice = nullptr;
+		mPhysicalDevice = nullptr;
+		mDevice = nullptr;
 		mSurface = VK_NULL_HANDLE;
 
 		mIsInitialized = false;
@@ -58,7 +66,7 @@ namespace render {
 		
 		VkSwapchainKHR oldSwapchain = mSwapChain;
 		CreateSwapChain(windowExtent, oldSwapchain);
-		vkDestroySwapchainKHR(mGraphicsDevice->GetDevice(), oldSwapchain, nullptr);
+		vkDestroySwapchainKHR(mDevice->Get(), oldSwapchain, nullptr);
 
 		CreateImageViews();
 
@@ -67,7 +75,7 @@ namespace render {
 
 	bool Swapchain::AcquireImage(VkSemaphore imageAvailiableSemaphore, uint32_t& imageIndex) {
 		// 从交换链中获取可用的图像，获取到之后触发imageAvailiableSemaphore，表示可以开始画了
-		VkResult result = vkAcquireNextImageKHR(mGraphicsDevice->GetDevice(), mSwapChain, UINT64_MAX, imageAvailiableSemaphore, VK_NULL_HANDLE, &imageIndex);
+		VkResult result = vkAcquireNextImageKHR(mDevice->Get(), mSwapChain, UINT64_MAX, imageAvailiableSemaphore, VK_NULL_HANDLE, &imageIndex);
 	
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
 			return true;
@@ -94,7 +102,7 @@ namespace render {
 		presentInfo.pSwapchains = swapchains.data();		// 返回给哪个交换链
 		presentInfo.pImageIndices = &imageIndex;	// 返回的图片编号
 		presentInfo.pResults = nullptr;				// 各个交换链的返回值（成功与否），此处只用一个交换链，没必要用它
-		VkResult result = vkQueuePresentKHR(mGraphicsDevice->GetPresentQueue(), &presentInfo);
+		VkResult result = vkQueuePresentKHR(mDevice->GetPresentQueue(), &presentInfo);
 
 		if (result == VK_SUCCESS) {
 			return true;
@@ -110,7 +118,7 @@ namespace render {
 
     void Swapchain::CreateSwapChain(VkExtent2D windowExtent, VkSwapchainKHR oldSwapchain) {
 		// 获取物理设备支持的交换链配置信息
-		SwapChainSupportdetails swapChainSupport = mGraphicsDevice->QuerySwapChainSupport();
+		SwapChainSupportdetails swapChainSupport = mPhysicalDevice->QuerySwapChainSupport();
 
 		// 选择交换链配置 格式+颜色空间
 		VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -124,7 +132,7 @@ namespace render {
 			swapChainSupport.capabilities.minImageCount, 
 			swapChainSupport.capabilities.maxImageCount);
 		// 模式
-		QueueFamilyIndices indices = mGraphicsDevice->GetQueueFamilies();
+		PhysicalDevice::QueueFamilyIndices indices = mPhysicalDevice->GetQueueFamilyIndices();
 		std::vector<uint32_t> indicesList(0);
 		VkSharingMode sharingMode = ChooseSharingMode(indices, indicesList);
 
@@ -146,14 +154,14 @@ namespace render {
 		createInfo.presentMode = presentMode;
 		createInfo.clipped = VK_TRUE;		// 不关心被（其他窗口）遮挡像素的颜色
 		createInfo.oldSwapchain = oldSwapchain;
-		if (vkCreateSwapchainKHR(mGraphicsDevice->GetDevice(), &createInfo, nullptr, &mSwapChain) != VK_SUCCESS) {
+		if (vkCreateSwapchainKHR(mDevice->Get(), &createInfo, nullptr, &mSwapChain) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create swap chain!");
 		}
 
 		// 取出交换链中的图像
-		vkGetSwapchainImagesKHR(mGraphicsDevice->GetDevice(), mSwapChain, &mImageCount, nullptr);
+		vkGetSwapchainImagesKHR(mDevice->Get(), mSwapChain, &mImageCount, nullptr);
 		mSwapchainImages.resize(mImageCount);
-		vkGetSwapchainImagesKHR(mGraphicsDevice->GetDevice(), mSwapChain, &mImageCount, mSwapchainImages.data());
+		vkGetSwapchainImagesKHR(mDevice->Get(), mSwapChain, &mImageCount, mSwapchainImages.data());
 
 		// 保存格式和分辨率信息
 		mSwapchainImageFormat = surfaceFormat.format;
@@ -177,7 +185,7 @@ namespace render {
 			viewInfo.subresourceRange.baseArrayLayer = 0;
 			viewInfo.subresourceRange.layerCount = 1;
 
-			if (vkCreateImageView(mGraphicsDevice->GetDevice(), &viewInfo, nullptr, &mSwapchainImageViews[i]) != VK_SUCCESS) {
+			if (vkCreateImageView(mDevice->Get(), &viewInfo, nullptr, &mSwapchainImageViews[i]) != VK_SUCCESS) {
 				throw std::runtime_error("failed to create texture image view!");
 			}
 		}
@@ -185,7 +193,7 @@ namespace render {
 
 	void Swapchain::DestroyImageViews() {
 		for (auto imageView : mSwapchainImageViews) {
-			vkDestroyImageView(mGraphicsDevice->GetDevice(), imageView, nullptr);
+			vkDestroyImageView(mDevice->Get(), imageView, nullptr);
 		}
 		mSwapchainImageViews.clear();
 	}
@@ -227,7 +235,7 @@ namespace render {
 		}
 	}
 
-	VkSharingMode Swapchain::ChooseSharingMode(const QueueFamilyIndices& indices, std::vector<uint32_t>& indicesList) {
+	VkSharingMode Swapchain::ChooseSharingMode(const PhysicalDevice::QueueFamilyIndices& indices, std::vector<uint32_t>& indicesList) {
 		indicesList.clear();
 		if (indices.graphicsFamily != indices.presentFamily) {
 			indicesList = { indices.graphicsFamily.value(), indices.presentFamily.value() };

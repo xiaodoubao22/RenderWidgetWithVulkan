@@ -4,19 +4,27 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
-#include "GraphicsDevice.h"
+#include "PhysicalDevice.h"
+#include "Device.h"
 
 namespace window {
     class WindowTemplate;
 }
 
 namespace render {
+    struct SwapChainSupportdetails {
+        bool isValid = false;
+        VkSurfaceCapabilitiesKHR capabilities = {};
+        std::vector<VkSurfaceFormatKHR> formats = {};
+        std::vector<VkPresentModeKHR> presentModes = {};
+    };
+
     class Swapchain {
     public:
         Swapchain();
         ~Swapchain();
 
-        bool Init(GraphicsDevice* graphicsDevice, VkExtent2D windowExtent, VkSurfaceKHR surface);
+        bool Init(PhysicalDevice* physicalDevice, Device* device, VkExtent2D windowExtent, VkSurfaceKHR surface);
         bool CleanUp();
         bool Recreate(VkExtent2D windowExtent);
 
@@ -35,13 +43,15 @@ namespace render {
         VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
         VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availiablePresentModes);
         VkExtent2D ChooseSwapExtent(VkExtent2D windowExtent, const VkSurfaceCapabilitiesKHR& capabilities);
-        VkSharingMode ChooseSharingMode(const QueueFamilyIndices& indices, std::vector<uint32_t>& indicesList);
+        VkSharingMode ChooseSharingMode(const PhysicalDevice::QueueFamilyIndices& indices, std::vector<uint32_t>& indicesList);
 
     private:
         bool mIsInitialized = false;
 
         // external objects
-        GraphicsDevice* mGraphicsDevice = nullptr;
+        //GraphicsDevice* mGraphicsDevice = nullptr;
+        PhysicalDevice* mPhysicalDevice = nullptr;
+        Device* mDevice = nullptr;
         VkSurfaceKHR mSurface = VK_NULL_HANDLE;
 
         // infos

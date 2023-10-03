@@ -10,40 +10,61 @@
 namespace render {
     RenderBase::RenderBase(window::WindowTemplate& w) : mWindow(w)
     {
-        mGraphicsDevice = new GraphicsDevice();
+        //mGraphicsDevice = new GraphicsDevice();
+        mPhysicalDevice = new PhysicalDevice();
+        mDevice = new Device();
         mSwapchain = new Swapchain();
     }
 
     RenderBase::~RenderBase() {
-        delete mGraphicsDevice;
+        delete mPhysicalDevice;
+        delete mDevice;
         delete mSwapchain;
     }
 
     void RenderBase::Init() {
         CheckValidationLayerSupport(setting::enableValidationLayer);
 
-        // create basic objects
+        // instance
         CreateInstance();
-        DebugUtils::GetInstance().Setup(mInstance);
+
+        // debug utils
+        if (setting::enableValidationLayer) {
+            DebugUtils::GetInstance().Setup(mInstance);
+        }
+        
+        // surface
         mSurface = mWindow.CreateSurface(mInstance);
-        mGraphicsDevice->Init(mInstance, mSurface);
-        mSwapchain->Init(mGraphicsDevice, mWindow.GetWindowExtent(), mSurface);
+
+        
+        // physical device
+        std::function<bool(VkPhysicalDevice)> testFunc =
+            std::bind(&RenderBase::PhysicalDeviceSelectionCondition, this, std::placeholders::_1);
+        mPhysicalDevice->SetAdditionalSuiatbleTestFunction(testFunc);
+        mPhysicalDevice->Init(mInstance, mSurface);
+        // device
+        mDevice->Init(mPhysicalDevice);
+        // swapchain
+        mSwapchain->Init(mPhysicalDevice, mDevice, mWindow.GetWindowExtent(), mSurface);
     }
 
     void RenderBase::CleanUp() {
         // destroy basic objects
         mSwapchain->CleanUp();
-        mGraphicsDevice->CleanUp();
+        mDevice->CleanUp();
+        mPhysicalDevice->CleanUp();
         vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
-        DebugUtils::GetInstance().Destroy(mInstance);
+
+        if (setting::enableValidationLayer) {
+            DebugUtils::GetInstance().Destroy(mInstance);
+        }
+
         vkDestroyInstance(mInstance, nullptr);
     }
 
-    VkDevice RenderBase::GetDevice() {
-        if (mGraphicsDevice == nullptr) {
-            throw std::runtime_error("mGraphicsDevice is null");
-        }
-        return mGraphicsDevice->GetDevice();
+    bool RenderBase::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
+        std::cout << "No additional conditions on choosing physical device\n";
+        return true;
     }
 
     void RenderBase::CreateInstance() {

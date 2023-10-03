@@ -10,8 +10,9 @@ namespace render {
 
     }
 
-    void RenderPassTemplate::Init(GraphicsDevice* graphicsDevice, Swapchain* swapchain) {
-        mGraphicsDevice = graphicsDevice;
+    void RenderPassTemplate::Init(PhysicalDevice* physicalDevice, Device* device, Swapchain* swapchain) {
+        mPhysicalDevice = physicalDevice;
+        mDevice = device;
         mSwapchain = swapchain;
 
         FillAttachmentDescriptions(mAttachments);
@@ -19,7 +20,11 @@ namespace render {
     }
 
     void RenderPassTemplate::CleanUp() {
-        vkDestroyRenderPass(mGraphicsDevice->GetDevice(), mRenderPass, nullptr);
+        vkDestroyRenderPass(mDevice->Get(), mRenderPass, nullptr);
+
+        mPhysicalDevice = nullptr;
+        mDevice = nullptr;
+        mSwapchain = nullptr;
     }
 
 }

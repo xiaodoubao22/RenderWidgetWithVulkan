@@ -1,7 +1,9 @@
 #ifndef __RENDER_BASE__
 #define __RENDER_BASE__
 
-#include "GraphicsDevice.h"
+//#include "GraphicsDevice.h"
+#include "PhysicalDevice.h"
+#include "Device.h"
 #include "Swapchain.h"
 
 #include <vector>
@@ -17,7 +19,8 @@ namespace render {
         void Init();
         void CleanUp();
 
-        VkDevice GetDevice();
+        VkDevice GetDevice() { return mDevice->Get(); }
+        virtual bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice);
     private:
         void CreateInstance();
 
@@ -35,7 +38,9 @@ namespace render {
         VkInstance mInstance = VK_NULL_HANDLE;
         VkSurfaceKHR mSurface = VK_NULL_HANDLE;
 
-        GraphicsDevice* mGraphicsDevice = nullptr;
+        //GraphicsDevice* mGraphicsDevice = nullptr;
+        PhysicalDevice* mPhysicalDevice = nullptr;
+        Device* mDevice = nullptr;
         Swapchain* mSwapchain = nullptr;
 
         // depth resources and terget framebuffers
