@@ -1,12 +1,12 @@
 #ifndef __RENDER_BASE__
 #define __RENDER_BASE__
 
-//#include "GraphicsDevice.h"
 #include "PhysicalDevice.h"
 #include "Device.h"
 #include "Swapchain.h"
 
 #include <vector>
+
 #include <vulkan/vulkan.h>
 
 namespace render {
@@ -20,7 +20,12 @@ namespace render {
         void CleanUp();
 
         VkDevice GetDevice() { return mDevice->Get(); }
+
+        // inherit interface
         virtual bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice);
+        virtual std::vector<const char*> FillDeviceExtensions();
+        virtual void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice);
+
     private:
         void CreateInstance();
 
@@ -38,7 +43,6 @@ namespace render {
         VkInstance mInstance = VK_NULL_HANDLE;
         VkSurfaceKHR mSurface = VK_NULL_HANDLE;
 
-        //GraphicsDevice* mGraphicsDevice = nullptr;
         PhysicalDevice* mPhysicalDevice = nullptr;
         Device* mDevice = nullptr;
         Swapchain* mSwapchain = nullptr;

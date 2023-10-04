@@ -231,7 +231,8 @@ namespace render {
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		std::set<uint32_t> uniqueQueueFamilies = {
 			mQueueFamilyIndices.graphicsFamily.value(),
-			mQueueFamilyIndices.presentFamily.value() };	// 用set去重
+			mQueueFamilyIndices.presentFamily.value(),
+		};	// 用set去重
 
 		float queuePriority = 1.0f;		// 优先级
 		for (uint32_t queueFamily : uniqueQueueFamilies) {
@@ -245,7 +246,7 @@ namespace render {
 
 		// ------ fill device features -------
 		VkPhysicalDeviceFeatures deviceFeatures{};
-		deviceFeatures.samplerAnisotropy = VK_TRUE;	// 各向异性滤波，暂时不用
+		//deviceFeatures.samplerAnisotropy = VK_TRUE;	// 各向异性滤波，暂时不用
 
 		// ------ create device -------
 		VkDeviceCreateInfo createInfo{};
@@ -253,8 +254,8 @@ namespace render {
 		createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());	// 两个命令队列
 		createInfo.pQueueCreateInfos = queueCreateInfos.data();								// 两个命令队列
 		createInfo.pEnabledFeatures = &deviceFeatures;
-		createInfo.enabledExtensionCount = consts::deviceExtensions.size();	// 设备支持的拓展：交换链等
-		createInfo.ppEnabledExtensionNames = consts::deviceExtensions.data();
+		createInfo.enabledExtensionCount = mPhysicalDevice->GetDeviceExtensionsHandle().extensionsCount;	// 设备支持的拓展：交换链等
+		createInfo.ppEnabledExtensionNames = mPhysicalDevice->GetDeviceExtensionsHandle().extensionNamepPtr;
 		if (setting::enableValidationLayer) {
 			createInfo.enabledLayerCount = consts::validationLayers.size();
 			createInfo.ppEnabledLayerNames = consts::validationLayers.data();
@@ -262,14 +263,7 @@ namespace render {
 		else {
 			createInfo.enabledLayerCount = 0;
 		}
-
-		VkPhysicalDeviceFragmentShadingRateFeaturesKHR shadingRateCreateInfo{};
-		shadingRateCreateInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
-		shadingRateCreateInfo.pipelineFragmentShadingRate = true;
-		shadingRateCreateInfo.attachmentFragmentShadingRate = false;
-		shadingRateCreateInfo.primitiveFragmentShadingRate = false;
-
-		createInfo.pNext = &shadingRateCreateInfo;
+		createInfo.pNext = mPhysicalDevice->GetRequestedExtensionFeatureHeadPtr();
 
 		if (vkCreateDevice(mPhysicalDevice->Get(), &createInfo, nullptr, &mDevice) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create logical device!");

@@ -1,16 +1,16 @@
-#include "RenderPassTest.h"
+#include "RenderPassShadingRate.h"
 
 #include <stdexcept>
 #include <iostream>
 
 namespace render {
-    RenderPassTest::RenderPassTest() {}
+	RenderPassShadingRate::RenderPassShadingRate() {}
 
-    RenderPassTest::~RenderPassTest() {}
+	RenderPassShadingRate::~RenderPassShadingRate() {}
 
-    void RenderPassTest::FillAttachmentDescriptions(std::vector<VkAttachmentDescription2>& attachments) {
+	void RenderPassShadingRate::FillAttachmentDescriptions(std::vector<VkAttachmentDescription2>& attachments) {
 		attachments.clear();
-		attachments = std::vector<VkAttachmentDescription2>(2, { VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2 });
+		attachments = std::vector<VkAttachmentDescription2>(3, { VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2 });
 
 		// 查找合适的深度缓冲格式
 		mDepthFormat = GetPhisicalDevice()->FindSupportedFormat(
@@ -36,19 +36,37 @@ namespace render {
 		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 模板操作此处不用
 		attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// 进来的格式无所谓
 		attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;		// 渲染后被设为该格式
-    }
+		// shading rate附件
+		attachments[2].format = VK_FORMAT_R8_UINT;
+		attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;		// 渲染前清屏
+		attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 渲染后不关心
+		attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;	// 模板操作此处不用
+		attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 模板操作此处不用
+		attachments[2].initialLayout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;	// 进来的格式无所谓
+		attachments[2].finalLayout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;		// 渲染后被设为该格式
+	}
 
-    void RenderPassTest::CreateRenderPass(VkRenderPass& renderPass) {
+	void RenderPassShadingRate::CreateRenderPass(VkRenderPass& renderPass) {
 		// subpass
 		VkAttachmentReference2 colorAttachmentRef{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2 };
 		colorAttachmentRef.attachment = 0;	// attachment的下标，第0个
 		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkAttachmentReference2 depthAttachmentRef{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2 };
-		depthAttachmentRef.attachment = 1;	// attachment的下标，第1个
+		depthAttachmentRef.attachment = 1;
 		depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-		std::vector<VkSubpassDescription2> subpasses(1, { VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2 });
+		VkAttachmentReference2 shadingRateAttachment{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2 };
+		shadingRateAttachment.attachment = 2;
+		shadingRateAttachment.layout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;
+
+		VkFragmentShadingRateAttachmentInfoKHR shadingRateAttachmentInfo{};
+		shadingRateAttachmentInfo.sType = VK_STRUCTURE_TYPE_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR;
+		shadingRateAttachmentInfo.pFragmentShadingRateAttachment = &shadingRateAttachment;
+		shadingRateAttachmentInfo.shadingRateAttachmentTexelSize = { 16, 16 };
+
+		std::vector<VkSubpassDescription2> subpasses(1, { VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2 });	// 一个subpass
 		subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpasses[0].colorAttachmentCount = 1;
 		subpasses[0].pColorAttachments = &colorAttachmentRef;		// 颜色缓冲
@@ -56,6 +74,7 @@ namespace render {
 		subpasses[0].pInputAttachments = nullptr;
 		subpasses[0].pResolveAttachments = nullptr;
 		subpasses[0].pPreserveAttachments = nullptr;
+		subpasses[0].pNext = &shadingRateAttachmentInfo;
 
 		std::vector<VkSubpassDependency2> dependencys(1, { VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2 });
 		dependencys[0].srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -79,5 +98,5 @@ namespace render {
 		if (vkCreateRenderPass2(GetDevice()->Get(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create render pass!");
 		}
-    }
+	}
 }

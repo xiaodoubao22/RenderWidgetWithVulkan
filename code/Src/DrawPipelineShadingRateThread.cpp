@@ -1,4 +1,4 @@
-#include "DrawTextureThread.h"
+#include "DrawPipelineShadingRateThread.h"
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
@@ -7,34 +7,34 @@
 #include <iostream>
 #include <stdexcept>
 #include <array>
+#include <bitset>
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 namespace render {
-    DrawTextureThread::DrawTextureThread(window::WindowTemplate& w) : RenderBase(w)
+    DrawPipelineShadingRateThread::DrawPipelineShadingRateThread(window::WindowTemplate& w) : RenderBase(w)
     {
         mRenderPassTest = new RenderPassTest();
-        mPipelineDrawTexture = new PipelineDrawTexture();
+        mPipelineVariableShadingRate = new PipelineVariableShadingRate();
     }
 
-    DrawTextureThread::~DrawTextureThread() {
-        delete mPipelineDrawTexture;
+    DrawPipelineShadingRateThread::~DrawPipelineShadingRateThread() {
+        delete mPipelineVariableShadingRate;
         delete mRenderPassTest;
     }
 
-    void DrawTextureThread::SetFramebufferResized() {
+    void DrawPipelineShadingRateThread::SetFramebufferResized() {
         std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
         mFramebufferResized = true;
     }
 
-    void DrawTextureThread::OnThreadInit() {
+    void DrawPipelineShadingRateThread::OnThreadInit() {
         RenderBase::Init();
-        
+
         // create render objects
         CreateSyncObjects();
         mRenderPassTest->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
-        mPipelineDrawTexture->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(),
+        mPipelineVariableShadingRate->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(),
             { mRenderPassTest->Get(), 0 });
         mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
@@ -47,10 +47,10 @@ namespace render {
         CreateDescriptorSets();
     }
 
-    void DrawTextureThread::OnThreadLoop() {
+    void DrawPipelineShadingRateThread::OnThreadLoop() {
         // 等待前一帧结束(等待队列中的命令执行完)
         vkWaitForFences(RenderBase::GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
-    
+
         // 获取图像
         uint32_t imageIndex;
         if (!mSwapchain->AcquireImage(mImageAvailableSemaphore, imageIndex)) {
@@ -99,7 +99,7 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::OnThreadDestroy() {
+    void DrawPipelineShadingRateThread::OnThreadDestroy() {
         vkDeviceWaitIdle(RenderBase::GetDevice());
 
         // destroy render objects
@@ -111,7 +111,7 @@ namespace render {
         CleanUpFramebuffers();
         CleanUpDepthResources();
         RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
-        mPipelineDrawTexture->CleanUp();
+        mPipelineVariableShadingRate->CleanUp();
         mRenderPassTest->CleanUp();
         CleanUpSyncObjects();
 
@@ -119,7 +119,73 @@ namespace render {
         RenderBase::CleanUp();
     }
 
-    void DrawTextureThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
+    bool DrawPipelineShadingRateThread::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
+        std::cout << "DrawPipelineShadingRateThread::PhysicalDeviceSelectionCondition" << std::endl;
+        return true;
+    }
+
+    std::vector<const char*> DrawPipelineShadingRateThread::FillDeviceExtensions() {
+        std::vector<const char*> extensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
+        };
+        return extensions;
+    }
+
+    void DrawPipelineShadingRateThread::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {
+        auto& shadingRateCreateInfo = physicalDevice->RequestExtensionsFeatures<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR);
+        shadingRateCreateInfo.pipelineFragmentShadingRate = true;
+        shadingRateCreateInfo.attachmentFragmentShadingRate = false;
+        shadingRateCreateInfo.primitiveFragmentShadingRate = false;
+
+        // ******************查询VRS特性，TODO 移到选择GPU的逻辑中 *******************
+        // feature
+        VkPhysicalDeviceFragmentShadingRateFeaturesKHR physicalDeviceFSRFeatures{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR
+        };
+        VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
+        physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        physicalDeviceFeatures2.pNext = &physicalDeviceFSRFeatures;
+        vkGetPhysicalDeviceFeatures2(physicalDevice->Get(), &physicalDeviceFeatures2);
+
+        std::cout << "physicalDeviceFSRFeatures : "
+            << physicalDeviceFSRFeatures.attachmentFragmentShadingRate << " "
+            << physicalDeviceFSRFeatures.pipelineFragmentShadingRate << " "
+            << physicalDeviceFSRFeatures.primitiveFragmentShadingRate << std::endl;
+
+        // properties
+        VkPhysicalDeviceFragmentShadingRatePropertiesKHR physicalDeviceFSRProperties{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_PROPERTIES_KHR
+        };
+        VkPhysicalDeviceProperties2 physicalDeviceProperties2{};
+        physicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        physicalDeviceProperties2.pNext = &physicalDeviceFSRProperties;
+        vkGetPhysicalDeviceProperties2(physicalDevice->Get(), &physicalDeviceProperties2);
+        std::cout << "physicalDeviceFSRProperties : "
+            << "(" << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width << ", "
+            << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height << ") "
+            << "(" << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width << ", "
+            << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height << ") "
+            << "(" << physicalDeviceFSRProperties.maxFragmentSizeAspectRatio << ")\n";
+
+        // availiable shading rate
+        uint32_t availiableShadingRateSize = 0;
+        std::vector<VkPhysicalDeviceFragmentShadingRateKHR> availiableShadingRate(0);
+        VkResult res = GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, nullptr);
+        if (availiableShadingRateSize != 0 && res == VK_SUCCESS) {
+            availiableShadingRate.resize(availiableShadingRateSize, { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR });
+            GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, availiableShadingRate.data());
+        }
+
+        for (VkPhysicalDeviceFragmentShadingRateKHR& shadingRate : availiableShadingRate) {
+            std::cout << std::bitset<sizeof(VkSampleCountFlags) * 8>(shadingRate.sampleCounts)
+                << " (" << shadingRate.fragmentSize.width << "," << shadingRate.fragmentSize.height << ")" << std::endl;
+        }
+        // **********************************************************************
+    }
+
+    void DrawPipelineShadingRateThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
         // 开始写入
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -145,7 +211,9 @@ namespace render {
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         // 绑定Pipeline
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineDrawTexture->GetPipeline());
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineVariableShadingRate->GetPipeline());
+
+        // dynamic states:
         VkViewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
@@ -154,6 +222,7 @@ namespace render {
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
         VkRect2D scissor{};
         scissor.offset = { 0, 0 };
         scissor.extent = mSwapchain->GetExtent();
@@ -169,13 +238,19 @@ namespace render {
 
         // 绑定DescriptorSet
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            mPipelineDrawTexture->GetPipelineLayout(),
+            mPipelineVariableShadingRate->GetPipelineLayout(),
             0, 1, &mDescriptorSet,
             0, nullptr);
 
         //画图
-        vkCmdDrawIndexed(commandBuffer, mQuadIndices.size(), 1, 0, 0, 0);
-        //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
+        std::vector<VkExtent2D> shadingRates = { { 1, 1 }, {2, 2}, {4, 4}, {2, 4} };
+        std::vector<VkFragmentShadingRateCombinerOpKHR> combinerOps(2, VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR);
+        for (int i = 0; i < 4; i++) {
+            // 每个draw call用不同的shading rate
+            VkCmdSetFragmentShadingRateKHR(RenderBase::mInstance,
+                commandBuffer, &shadingRates[i], combinerOps.data());
+            vkCmdDrawIndexed(commandBuffer, mQuadIndices.size(), 1, i * mQuadIndices.size(), 0, 0);
+        }
 
         // 结束Pass
         vkCmdEndRenderPass(commandBuffer);
@@ -186,7 +261,7 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::Resize() {
+    void DrawPipelineShadingRateThread::Resize() {
         vkDeviceWaitIdle(RenderBase::GetDevice());
 
         CleanUpFramebuffers();
@@ -197,7 +272,7 @@ namespace render {
         CreateFramebuffers();
     }
 
-    void DrawTextureThread::CreateDepthResources() {
+    void DrawPipelineShadingRateThread::CreateDepthResources() {
         // image
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -237,14 +312,14 @@ namespace render {
         //	VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
     }
 
-    void DrawTextureThread::CleanUpDepthResources() {
+    void DrawPipelineShadingRateThread::CleanUpDepthResources() {
         // 销毁深度缓冲
         vkDestroyImageView(RenderBase::GetDevice(), mDepthImageView, nullptr);
         vkDestroyImage(RenderBase::GetDevice(), mDepthImage, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mDepthImageMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateFramebuffers() {
+    void DrawPipelineShadingRateThread::CreateFramebuffers() {
         // 对每一个imageView创建帧缓冲
         std::vector<VkImageView> swapChainImageViews = mSwapchain->GetImageViews();
         mSwapchainFramebuffers.resize(swapChainImageViews.size());
@@ -269,14 +344,14 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpFramebuffers() {
+    void DrawPipelineShadingRateThread::CleanUpFramebuffers() {
         // 销毁frame buffer
         for (auto framebuffer : mSwapchainFramebuffers) {
             vkDestroyFramebuffer(RenderBase::GetDevice(), framebuffer, nullptr);
         }
     }
 
-    void DrawTextureThread::CreateSyncObjects() {
+    void DrawPipelineShadingRateThread::CreateSyncObjects() {
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         VkFenceCreateInfo fenceInfo{};
@@ -289,14 +364,24 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpSyncObjects() {
+    void DrawPipelineShadingRateThread::CleanUpSyncObjects() {
         vkDestroySemaphore(RenderBase::GetDevice(), mImageAvailableSemaphore, nullptr);
         vkDestroySemaphore(RenderBase::GetDevice(), mRenderFinishedSemaphore, nullptr);
         vkDestroyFence(RenderBase::GetDevice(), mInFlightFence, nullptr);
     }
 
-    void DrawTextureThread::CreateVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(mQuadVertices[0]) * mQuadVertices.size();
+    void DrawPipelineShadingRateThread::CreateVertexBuffer() {
+        // 准备数据
+        std::vector<Vertex2DColorTexture> quadVerticesData = {};
+        std::vector<glm::vec2> positionOffsets = { {-0.5, -0.5}, {0.5, -0.5}, {-0.5, 0.5}, {0.5, 0.5} };
+        for (auto& positionOffset : positionOffsets) {  // 把mQuadVertices复制四份
+            for (auto& vertex : mQuadVertices) {
+                Vertex2DColorTexture v = vertex;
+                v.position += positionOffset;
+                quadVerticesData.push_back(v);
+            }
+        }
+        VkDeviceSize bufferSize = sizeof(quadVerticesData[0]) * quadVerticesData.size();
 
         // 创建临时缓冲
         VkBuffer stagingBuffer;
@@ -309,7 +394,7 @@ namespace render {
         // 数据拷贝到临时缓冲
         void* data;
         vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, mQuadVertices.data(), (size_t)bufferSize);
+        memcpy(data, quadVerticesData.data(), (size_t)bufferSize);
         vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建 mVertexBuffer
@@ -326,14 +411,22 @@ namespace render {
         vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CleanUpVertexBuffer() {
+    void DrawPipelineShadingRateThread::CleanUpVertexBuffer() {
         // 销毁顶点缓冲区及显存
         vkDestroyBuffer(RenderBase::GetDevice(), mVertexBuffer, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mVertexBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateIndexBuffer() {
-        VkDeviceSize bufferSize = sizeof(mQuadIndices[0]) * mQuadIndices.size();
+    void DrawPipelineShadingRateThread::CreateIndexBuffer() {
+        // 准备数据
+        std::vector<uint16_t> quadIndices = {};
+        int quadCount = 4;
+        for (int i = 0; i < quadCount; i++) {
+            for (auto index : mQuadIndices) {
+                quadIndices.push_back(index + i * quadCount);
+            }
+        }
+        VkDeviceSize bufferSize = sizeof(quadIndices[0]) * quadIndices.size();
 
         // 创建临时缓冲
         VkBuffer stagingBuffer;
@@ -346,7 +439,7 @@ namespace render {
         // 数据拷贝到临时缓冲
         void* data;
         vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, mQuadIndices.data(), (size_t)bufferSize);
+        memcpy(data, quadIndices.data(), (size_t)bufferSize);
         vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
 
         // 创建索引缓冲
@@ -363,12 +456,12 @@ namespace render {
         vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CleanUpIndexBuffer() {
+    void DrawPipelineShadingRateThread::CleanUpIndexBuffer() {
         vkDestroyBuffer(RenderBase::GetDevice(), mIndexBuffer, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mIndexBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateTexture() {
+    void DrawPipelineShadingRateThread::CreateTexture() {
         // 读取图片
         int texWidth, texHeight, texChannels;
         std::string texturePath = setting::dirTexture + std::string("test_texure.jpg");
@@ -455,13 +548,13 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpTexture() {
+    void DrawPipelineShadingRateThread::CleanUpTexture() {
         vkDestroyImageView(RenderBase::GetDevice(), mTestTextureImageView, nullptr);
         vkDestroyImage(RenderBase::GetDevice(), mTestTextureImage, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mTestTextureImageMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateTextureSampler() {
+    void DrawPipelineShadingRateThread::CreateTextureSampler() {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -495,12 +588,12 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpTextureSampler() {
+    void DrawPipelineShadingRateThread::CleanUpTextureSampler() {
         vkDestroySampler(RenderBase::GetDevice(), mTexureSampler, nullptr);
     }
 
-    void DrawTextureThread::CreateDescriptorPool() {
-        std::vector<VkDescriptorPoolSize> poolSizes = mPipelineDrawTexture->GetDescriptorSize();   // 池中各种类型的Descriptor个数
+    void DrawPipelineShadingRateThread::CreateDescriptorPool() {
+        std::vector<VkDescriptorPoolSize> poolSizes = mPipelineVariableShadingRate->GetDescriptorSize();   // 池中各种类型的Descriptor个数
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -512,12 +605,12 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpDescriptorPool() {
+    void DrawPipelineShadingRateThread::CleanUpDescriptorPool() {
         vkDestroyDescriptorPool(RenderBase::GetDevice(), mDescriptorPool, nullptr);
     }
 
-    void DrawTextureThread::CreateDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPipelineDrawTexture->GetDescriptorSetLayouts();
+    void DrawPipelineShadingRateThread::CreateDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPipelineVariableShadingRate->GetDescriptorSetLayouts();
 
         //// 从池中申请descriptor set
         VkDescriptorSetAllocateInfo allocInfo{};

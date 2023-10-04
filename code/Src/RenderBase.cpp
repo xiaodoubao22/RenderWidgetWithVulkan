@@ -35,15 +35,21 @@ namespace render {
         
         // surface
         mSurface = mWindow.CreateSurface(mInstance);
-
         
         // physical device
         std::function<bool(VkPhysicalDevice)> testFunc =
             std::bind(&RenderBase::PhysicalDeviceSelectionCondition, this, std::placeholders::_1);
         mPhysicalDevice->SetAdditionalSuiatbleTestFunction(testFunc);
+        mPhysicalDevice->SetDeviceExtensions(FillDeviceExtensions());
         mPhysicalDevice->Init(mInstance, mSurface);
+
         // device
+        if (!mPhysicalDevice->IsValid()) {
+            throw std::runtime_error("physical device invalid!");
+        }
+        RequestPhysicalDeviceFeatures(mPhysicalDevice);
         mDevice->Init(mPhysicalDevice);
+
         // swapchain
         mSwapchain->Init(mPhysicalDevice, mDevice, mWindow.GetWindowExtent(), mSurface);
     }
@@ -65,6 +71,15 @@ namespace render {
     bool RenderBase::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
         std::cout << "No additional conditions on choosing physical device\n";
         return true;
+    }
+
+    std::vector<const char*> RenderBase::FillDeviceExtensions() {
+        return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    }
+
+    void RenderBase::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {
+        std::cout << "Did not request any physical device features\n";
+        return;
     }
 
     void RenderBase::CreateInstance() {

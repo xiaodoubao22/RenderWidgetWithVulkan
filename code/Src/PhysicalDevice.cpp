@@ -3,7 +3,6 @@
 #include <stdexcept>
 #include <iostream>
 #include <vector>
-#include <bitset>
 
 #include "Utils.h"
 #include "Swapchain.h"
@@ -27,7 +26,6 @@ namespace render {
 		if (supportedSurface == VK_NULL_HANDLE) {
 			throw std::runtime_error("can not init graphics device with a null surface!");
 		}
-
 		mInstance = instance;
 		mSupportedSurface = supportedSurface;
 
@@ -39,10 +37,6 @@ namespace render {
 		mInstance = VK_NULL_HANDLE;
 		mSupportedSurface = VK_NULL_HANDLE;
 		mPhysicalDevice = VK_NULL_HANDLE;
-	}
-
-	void PhysicalDevice::SetAdditionalSuiatbleTestFunction(const std::function<bool(VkPhysicalDevice)>& func) {
-		mAdditionalSuiatbleTest = func;
 	}
 
 	SwapChainSupportdetails PhysicalDevice::QuerySwapChainSupport() {
@@ -137,7 +131,7 @@ namespace render {
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProperties);
 		std::cout << "device name: " << deviceProperties.deviceName << std::endl;
-		utils::PrintStringList(consts::deviceExtensions, "enable device extensions:");
+		utils::PrintStringList(mDeviceExtensions, "enable device extensions:");
 
 		uint32_t extensionCount;
 		vkEnumerateDeviceExtensionProperties(mPhysicalDevice, nullptr, &extensionCount, nullptr);
@@ -149,51 +143,6 @@ namespace render {
 		}
 		utils::PrintStringList(availableExtensionsNames, "availiable device extensions:");
 		std::cout << "------------------------------------------------\n\n";
-
-		// ******************查询VRS特性，TODO 移到选择GPU的逻辑中 *******************
-		// feature
-		VkPhysicalDeviceFragmentShadingRateFeaturesKHR physicalDeviceFSRFeatures{
-			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR
-		};
-		VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
-		physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-		physicalDeviceFeatures2.pNext = &physicalDeviceFSRFeatures;
-		vkGetPhysicalDeviceFeatures2(mPhysicalDevice, &physicalDeviceFeatures2);
-
-		std::cout << "physicalDeviceFSRFeatures : "
-			<< physicalDeviceFSRFeatures.attachmentFragmentShadingRate << " "
-			<< physicalDeviceFSRFeatures.pipelineFragmentShadingRate << " "
-			<< physicalDeviceFSRFeatures.primitiveFragmentShadingRate << std::endl;
-
-		// properties
-		VkPhysicalDeviceFragmentShadingRatePropertiesKHR physicalDeviceFSRProperties{
-			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_PROPERTIES_KHR
-		};
-		VkPhysicalDeviceProperties2 physicalDeviceProperties2{};
-		physicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-		physicalDeviceProperties2.pNext = &physicalDeviceFSRProperties;
-		vkGetPhysicalDeviceProperties2(mPhysicalDevice, &physicalDeviceProperties2);
-		std::cout << "physicalDeviceFSRProperties : "
-			<< "(" << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width << ", "
-			<< physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height << ") "
-			<< "(" << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width << ", "
-			<< physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height << ") "
-			<< "(" << physicalDeviceFSRProperties.maxFragmentSizeAspectRatio << ")\n";
-
-		// availiable shading rate
-		uint32_t availiableShadingRateSize = 0;
-		std::vector<VkPhysicalDeviceFragmentShadingRateKHR> availiableShadingRate(0);
-		VkResult res = GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, mPhysicalDevice, &availiableShadingRateSize, nullptr);
-		if (availiableShadingRateSize != 0 && res == VK_SUCCESS) {
-			availiableShadingRate.resize(availiableShadingRateSize, { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR });
-			GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, mPhysicalDevice, &availiableShadingRateSize, availiableShadingRate.data());
-		}
-
-		for (VkPhysicalDeviceFragmentShadingRateKHR& shadingRate : availiableShadingRate) {
-			std::cout << std::bitset<sizeof(VkSampleCountFlags) * 8>(shadingRate.sampleCounts)
-				<< " (" << shadingRate.fragmentSize.width << "," << shadingRate.fragmentSize.height << ")" << std::endl;
-		}
-		// **********************************************************************
 	}
 
 	bool PhysicalDevice::IsDeviceSuatiable(VkPhysicalDevice device) {
@@ -225,11 +174,12 @@ namespace render {
 			availableExtensionsNames.push_back(extension.extensionName);
 		}
 
-		if (!utils::CheckSupported(consts::deviceExtensions, availableExtensionsNames)) {
+		if (!utils::CheckSupported(mDeviceExtensions, availableExtensionsNames)) {
 			std::cout << deviceProperties.deviceName << " extension not suitable \n";
 			return false;
 		}
 
+		// 其余判断条件
 		if (mAdditionalSuiatbleTest != nullptr && !mAdditionalSuiatbleTest(device)) {
 			return false;
 		}

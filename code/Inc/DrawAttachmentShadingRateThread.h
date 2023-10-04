@@ -1,9 +1,10 @@
-#ifndef __DRAW_TEXTURE_THREAD__
-#define __DRAW_TEXTURE_THREAD__
+#ifndef __DRAW_ATTACHMENT_SHADING_RATE_THREAD__
+#define __DRAW_ATTACHMENT_SHADING_RATE_THREAD__
 
 #include "Thread.h"
-#include "PipelineDrawTexture.h"
-#include "RenderPassTest.h"
+//#include "PipelineDrawTexture.h"
+#include "PipelineVariableShadingRate.h"
+#include "RenderPassShadingRate.h"
 #include "RenderBase.h"
 #include "Mesh.h"
 
@@ -15,10 +16,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace render {
-    class DrawTextureThread : public common::Thread, public RenderBase {
+    class DrawAttachmentShadingRateThread : public common::Thread, public RenderBase {
     public:
-        explicit DrawTextureThread(window::WindowTemplate& w);
-        ~DrawTextureThread();
+        explicit DrawAttachmentShadingRateThread(window::WindowTemplate& w);
+        ~DrawAttachmentShadingRateThread();
 
         void SetFramebufferResized();
 
@@ -26,6 +27,10 @@ namespace render {
         virtual void OnThreadInit() override;
         virtual void OnThreadLoop() override;
         virtual void OnThreadDestroy() override;
+
+        bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) override;
+        std::vector<const char*> FillDeviceExtensions() override;
+        void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
 
     private:
         // ----- render functions -----
@@ -35,6 +40,9 @@ namespace render {
         // ----- create and clean up ----- 
         void CreateDepthResources();
         void CleanUpDepthResources();
+
+        void CreateShadingRateTextureResource();
+        void CleanUpShadingRateTextureResource();
 
         void CreateFramebuffers();
         void CleanUpFramebuffers();
@@ -58,18 +66,46 @@ namespace render {
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
 
+        void VkCmdSetFragmentShadingRateKHR(VkInstance instance, VkCommandBuffer commandBuffer,
+            const VkExtent2D* pFragmentSize, const VkFragmentShadingRateCombinerOpKHR combinerOps[2]) {
+            auto func = (PFN_vkCmdSetFragmentShadingRateKHR)vkGetInstanceProcAddr(instance, "vkCmdSetFragmentShadingRateKHR");
+            if (func != nullptr) {
+                func(commandBuffer, pFragmentSize, combinerOps);
+                return;
+            }
+            else {
+                std::runtime_error("vkGetInstanceProcAddr vkCmdSetFragmentShadingRateKHR failed!");
+                return;
+            }
+        }
+
+        VkResult GetPhysicalDeviceFragmentShadingRatesKHR(VkInstance instance, VkPhysicalDevice physicalDevice,
+            uint32_t* pFragmentShadingRateCount, VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates) {
+            auto func = (PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFragmentShadingRatesKHR");
+            if (func != nullptr) {
+                return func(physicalDevice, pFragmentShadingRateCount, pFragmentShadingRates);
+            }
+            else {
+                return VK_ERROR_EXTENSION_NOT_PRESENT;
+            }
+        }
     private:
         bool mFramebufferResized = false;
         std::mutex mFramebufferResizeMutex;
 
         // ---- render objects ----
-        RenderPassTest* mRenderPassTest = nullptr;
-        PipelineDrawTexture* mPipelineDrawTexture = nullptr;
+        RenderPassShadingRate* mRenderPassShadingRate = nullptr;
+        PipelineVariableShadingRate* mPipelineVariableShadingRate = nullptr;
 
         // depth resources
         VkImage mDepthImage = VK_NULL_HANDLE;
         VkDeviceMemory mDepthImageMemory = VK_NULL_HANDLE;
         VkImageView mDepthImageView = VK_NULL_HANDLE;
+
+        // shading rate resource
+        VkImage mShadingRateImage = VK_NULL_HANDLE;
+        VkDeviceMemory mShadingRateImageMemory = VK_NULL_HANDLE;
+        VkImageView mShadingRateImageView = VK_NULL_HANDLE;
 
         std::vector<VkFramebuffer> mSwapchainFramebuffers = {};
         VkCommandBuffer mCommandBuffer = VK_NULL_HANDLE;
@@ -112,5 +148,6 @@ namespace render {
 }
 
 
-#endif // !__DRAW_TEXTURE_THREAD__
+#endif // !__DRAW_ATTACHMENT_SHADING_RATE_THREAD__
+
 

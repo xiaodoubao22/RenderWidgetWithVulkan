@@ -1,4 +1,4 @@
-#include "DrawTextureThread.h"
+#include "DrawAttachmentShadingRateThread.h"
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
@@ -7,37 +7,38 @@
 #include <iostream>
 #include <stdexcept>
 #include <array>
+#include <bitset>
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 namespace render {
-    DrawTextureThread::DrawTextureThread(window::WindowTemplate& w) : RenderBase(w)
+    DrawAttachmentShadingRateThread::DrawAttachmentShadingRateThread(window::WindowTemplate& w) : RenderBase(w)
     {
-        mRenderPassTest = new RenderPassTest();
-        mPipelineDrawTexture = new PipelineDrawTexture();
+        mRenderPassShadingRate = new RenderPassShadingRate();
+        mPipelineVariableShadingRate = new PipelineVariableShadingRate();
     }
 
-    DrawTextureThread::~DrawTextureThread() {
-        delete mPipelineDrawTexture;
-        delete mRenderPassTest;
+    DrawAttachmentShadingRateThread::~DrawAttachmentShadingRateThread() {
+        delete mPipelineVariableShadingRate;
+        delete mRenderPassShadingRate;
     }
 
-    void DrawTextureThread::SetFramebufferResized() {
+    void DrawAttachmentShadingRateThread::SetFramebufferResized() {
         std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
         mFramebufferResized = true;
     }
 
-    void DrawTextureThread::OnThreadInit() {
+    void DrawAttachmentShadingRateThread::OnThreadInit() {
         RenderBase::Init();
-        
+
         // create render objects
         CreateSyncObjects();
-        mRenderPassTest->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
-        mPipelineDrawTexture->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(),
-            { mRenderPassTest->Get(), 0 });
+        mRenderPassShadingRate->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
+        mPipelineVariableShadingRate->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(),
+            { mRenderPassShadingRate->Get(), 0 });
         mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
+        CreateShadingRateTextureResource();
         CreateFramebuffers();
         CreateVertexBuffer();
         CreateIndexBuffer();
@@ -47,10 +48,10 @@ namespace render {
         CreateDescriptorSets();
     }
 
-    void DrawTextureThread::OnThreadLoop() {
+    void DrawAttachmentShadingRateThread::OnThreadLoop() {
         // 等待前一帧结束(等待队列中的命令执行完)
         vkWaitForFences(RenderBase::GetDevice(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
-    
+
         // 获取图像
         uint32_t imageIndex;
         if (!mSwapchain->AcquireImage(mImageAvailableSemaphore, imageIndex)) {
@@ -99,7 +100,7 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::OnThreadDestroy() {
+    void DrawAttachmentShadingRateThread::OnThreadDestroy() {
         vkDeviceWaitIdle(RenderBase::GetDevice());
 
         // destroy render objects
@@ -109,17 +110,84 @@ namespace render {
         CleanUpIndexBuffer();
         CleanUpVertexBuffer();
         CleanUpFramebuffers();
+        CleanUpShadingRateTextureResource();
         CleanUpDepthResources();
         RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
-        mPipelineDrawTexture->CleanUp();
-        mRenderPassTest->CleanUp();
+        mPipelineVariableShadingRate->CleanUp();
+        mRenderPassShadingRate->CleanUp();
         CleanUpSyncObjects();
 
         // destroy basic objects
         RenderBase::CleanUp();
     }
 
-    void DrawTextureThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
+    bool DrawAttachmentShadingRateThread::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
+        std::cout << "DrawAttachmentShadingRateThread::PhysicalDeviceSelectionCondition" << std::endl;
+        return true;
+    }
+
+    std::vector<const char*> DrawAttachmentShadingRateThread::FillDeviceExtensions() {
+        std::vector<const char*> extensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
+        };
+        return extensions;
+    }
+
+    void DrawAttachmentShadingRateThread::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {
+        auto& shadingRateCreateInfo = physicalDevice->RequestExtensionsFeatures<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR);
+        shadingRateCreateInfo.pipelineFragmentShadingRate = true;
+        shadingRateCreateInfo.attachmentFragmentShadingRate = true;
+        shadingRateCreateInfo.primitiveFragmentShadingRate = false;
+
+        // ******************查询VRS特性，TODO 移到选择GPU的逻辑中 *******************
+        // feature
+        VkPhysicalDeviceFragmentShadingRateFeaturesKHR physicalDeviceFSRFeatures{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR
+        };
+        VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
+        physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        physicalDeviceFeatures2.pNext = &physicalDeviceFSRFeatures;
+        vkGetPhysicalDeviceFeatures2(physicalDevice->Get(), &physicalDeviceFeatures2);
+
+        std::cout << "physicalDeviceFSRFeatures : "
+            << physicalDeviceFSRFeatures.attachmentFragmentShadingRate << " "
+            << physicalDeviceFSRFeatures.pipelineFragmentShadingRate << " "
+            << physicalDeviceFSRFeatures.primitiveFragmentShadingRate << std::endl;
+
+        // properties
+        VkPhysicalDeviceFragmentShadingRatePropertiesKHR physicalDeviceFSRProperties{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_PROPERTIES_KHR
+        };
+        VkPhysicalDeviceProperties2 physicalDeviceProperties2{};
+        physicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        physicalDeviceProperties2.pNext = &physicalDeviceFSRProperties;
+        vkGetPhysicalDeviceProperties2(physicalDevice->Get(), &physicalDeviceProperties2);
+        std::cout << "physicalDeviceFSRProperties : "
+            << "(" << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width << ", "
+            << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height << ") "
+            << "(" << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width << ", "
+            << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height << ") "
+            << "(" << physicalDeviceFSRProperties.maxFragmentSizeAspectRatio << ")\n";
+
+        // availiable shading rate
+        uint32_t availiableShadingRateSize = 0;
+        std::vector<VkPhysicalDeviceFragmentShadingRateKHR> availiableShadingRate(0);
+        VkResult res = GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, nullptr);
+        if (availiableShadingRateSize != 0 && res == VK_SUCCESS) {
+            availiableShadingRate.resize(availiableShadingRateSize, { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR });
+            GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, availiableShadingRate.data());
+        }
+
+        for (VkPhysicalDeviceFragmentShadingRateKHR& shadingRate : availiableShadingRate) {
+            std::cout << std::bitset<sizeof(VkSampleCountFlags) * 8>(shadingRate.sampleCounts)
+                << " (" << shadingRate.fragmentSize.width << "," << shadingRate.fragmentSize.height << ")" << std::endl;
+        }
+        // **********************************************************************
+    }
+
+    void DrawAttachmentShadingRateThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
         // 开始写入
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -136,7 +204,7 @@ namespace render {
         };
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = mRenderPassTest->Get();
+        renderPassInfo.renderPass = mRenderPassShadingRate->Get();
         renderPassInfo.framebuffer = mSwapchainFramebuffers[imageIndex];
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = mSwapchain->GetExtent();
@@ -145,7 +213,9 @@ namespace render {
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         // 绑定Pipeline
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineDrawTexture->GetPipeline());
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineVariableShadingRate->GetPipeline());
+
+        // dynamic states:
         VkViewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
@@ -154,10 +224,19 @@ namespace render {
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
         VkRect2D scissor{};
         scissor.offset = { 0, 0 };
         scissor.extent = mSwapchain->GetExtent();
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        std::vector<VkExtent2D> shadingRates = { { 1, 1 }, {2, 2}, {4, 4}, {2, 4} };
+        std::vector<VkFragmentShadingRateCombinerOpKHR> combinerOps = { 
+            VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR,
+            VK_FRAGMENT_SHADING_RATE_COMBINER_OP_MAX_KHR,
+        };
+        VkCmdSetFragmentShadingRateKHR(RenderBase::mInstance,
+            commandBuffer, &shadingRates[0], combinerOps.data());
 
         // 绑定顶点缓冲
         std::vector<VkBuffer> vertexBuffers = { mVertexBuffer };
@@ -169,13 +248,12 @@ namespace render {
 
         // 绑定DescriptorSet
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            mPipelineDrawTexture->GetPipelineLayout(),
+            mPipelineVariableShadingRate->GetPipelineLayout(),
             0, 1, &mDescriptorSet,
             0, nullptr);
 
         //画图
         vkCmdDrawIndexed(commandBuffer, mQuadIndices.size(), 1, 0, 0, 0);
-        //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
 
         // 结束Pass
         vkCmdEndRenderPass(commandBuffer);
@@ -186,18 +264,20 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::Resize() {
+    void DrawAttachmentShadingRateThread::Resize() {
         vkDeviceWaitIdle(RenderBase::GetDevice());
 
         CleanUpFramebuffers();
+        CleanUpShadingRateTextureResource();
         CleanUpDepthResources();
 
         mSwapchain->Recreate(mWindow.GetWindowExtent());
         CreateDepthResources();
+        CreateShadingRateTextureResource();
         CreateFramebuffers();
     }
 
-    void DrawTextureThread::CreateDepthResources() {
+    void DrawAttachmentShadingRateThread::CreateDepthResources() {
         // image
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -207,7 +287,7 @@ namespace render {
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
-        imageInfo.format = mRenderPassTest->GetDepthFormat();
+        imageInfo.format = mRenderPassShadingRate->GetDepthFormat();
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;		// 可选TILING_LINEAR:行优先 TILLING_OPTIMAL:一种容易访问的结构
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -221,7 +301,7 @@ namespace render {
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = mDepthImage;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = mRenderPassTest->GetDepthFormat();
+        viewInfo.format = mRenderPassShadingRate->GetDepthFormat();
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
@@ -237,26 +317,125 @@ namespace render {
         //	VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
     }
 
-    void DrawTextureThread::CleanUpDepthResources() {
+    void DrawAttachmentShadingRateThread::CleanUpDepthResources() {
         // 销毁深度缓冲
         vkDestroyImageView(RenderBase::GetDevice(), mDepthImageView, nullptr);
         vkDestroyImage(RenderBase::GetDevice(), mDepthImage, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mDepthImageMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateFramebuffers() {
+    void DrawAttachmentShadingRateThread::CreateShadingRateTextureResource() {
+        // 生成图片
+        //int texWidth, texHeight, texChannels;
+        //std::string texturePath = setting::dirTexture + std::string("test_texure.jpg");
+        //stbi_set_flip_vertically_on_load(true);
+        //stbi_uc* pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        //VkDeviceSize imageSize = texWidth * texHeight * 4;
+        //if (!pixels) {
+        //    throw std::runtime_error("failed to load test_texure.jpg!");
+        //}
+
+        // 生成图片
+        uint32_t imageWidth = std::ceil(double(mSwapchain->GetExtent().width) / 16.0);
+        uint32_t imageHeight = std::ceil(double(mSwapchain->GetExtent().height) / 16.0);
+        std::vector<uint8_t> vrsRegionImage(imageWidth * imageHeight, 0);
+        memset(vrsRegionImage.data(), 0x0A, (imageHeight / 2) * imageWidth); // 上半张图4*4， 下半张图1*1
+
+        // 创建临时缓冲
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        RenderBase::mDevice->CreateBuffer(vrsRegionImage.size() * sizeof(uint8_t),
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            stagingBuffer, stagingBufferMemory);
+
+        // 图像数据拷贝到临时缓冲，并释放pixels
+        void* data;
+        vkMapMemory(RenderBase::GetDevice(), stagingBufferMemory, 0, vrsRegionImage.size() * sizeof(uint8_t), 0, &data);
+        memcpy(data, vrsRegionImage.data(), static_cast<size_t>(vrsRegionImage.size() * sizeof(uint8_t)));
+        vkUnmapMemory(RenderBase::GetDevice(), stagingBufferMemory);
+        vrsRegionImage.clear();
+
+        // 创建shading rate图
+        VkImageCreateInfo imageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = imageWidth;
+        imageInfo.extent.height = imageHeight;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = VK_FORMAT_R8_UINT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.flags = 0; // Optional
+        RenderBase::mDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            mShadingRateImage, mShadingRateImageMemory);
+
+        // 转换image格式，undefined -> transferDst
+        Device::ImageMemoryBarrierInfo imageBarrierInfo{};
+        imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        imageBarrierInfo.srcAccessMask = 0;
+        imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        imageBarrierInfo.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        RenderBase::mDevice->TransitionImageLayout(mShadingRateImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+
+        // 拷贝数据，从buffer到image
+        RenderBase::mDevice->CopyBufferToImage(stagingBuffer, mShadingRateImage, imageWidth, imageHeight);
+
+        // 转换image格式，transferDst -> shaderReadOnly
+        imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;
+        imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        imageBarrierInfo.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        RenderBase::mDevice->TransitionImageLayout(mShadingRateImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+
+        // 清理临时缓冲
+        vkDestroyBuffer(RenderBase::GetDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
+
+        // 创建imageView
+        VkImageViewCreateInfo viewInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        viewInfo.image = mShadingRateImage;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = imageInfo.format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+        if (vkCreateImageView(RenderBase::GetDevice(), &viewInfo, nullptr, &mShadingRateImageView) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture image view!");
+        }
+    }
+
+    void DrawAttachmentShadingRateThread::CleanUpShadingRateTextureResource() {
+        // 销毁shading rate图
+        vkDestroyImageView(RenderBase::GetDevice(), mShadingRateImageView, nullptr);
+        vkDestroyImage(RenderBase::GetDevice(), mShadingRateImage, nullptr);
+        vkFreeMemory(RenderBase::GetDevice(), mShadingRateImageMemory, nullptr);
+    }
+
+    void DrawAttachmentShadingRateThread::CreateFramebuffers() {
         // 对每一个imageView创建帧缓冲
         std::vector<VkImageView> swapChainImageViews = mSwapchain->GetImageViews();
         mSwapchainFramebuffers.resize(swapChainImageViews.size());
         for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-            std::array<VkImageView, 2> attachments = {
+            std::array<VkImageView, 3> attachments = {
                 swapChainImageViews[i],
-                mDepthImageView
+                mDepthImageView,
+                mShadingRateImageView,
             };
 
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = mRenderPassTest->Get();
+            framebufferInfo.renderPass = mRenderPassShadingRate->Get();
             framebufferInfo.attachmentCount = attachments.size();	// framebuffer的附件个数
             framebufferInfo.pAttachments = attachments.data();								// framebuffer的附件
             framebufferInfo.width = mSwapchain->GetExtent().width;
@@ -269,14 +448,14 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpFramebuffers() {
+    void DrawAttachmentShadingRateThread::CleanUpFramebuffers() {
         // 销毁frame buffer
         for (auto framebuffer : mSwapchainFramebuffers) {
             vkDestroyFramebuffer(RenderBase::GetDevice(), framebuffer, nullptr);
         }
     }
 
-    void DrawTextureThread::CreateSyncObjects() {
+    void DrawAttachmentShadingRateThread::CreateSyncObjects() {
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         VkFenceCreateInfo fenceInfo{};
@@ -289,13 +468,13 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpSyncObjects() {
+    void DrawAttachmentShadingRateThread::CleanUpSyncObjects() {
         vkDestroySemaphore(RenderBase::GetDevice(), mImageAvailableSemaphore, nullptr);
         vkDestroySemaphore(RenderBase::GetDevice(), mRenderFinishedSemaphore, nullptr);
         vkDestroyFence(RenderBase::GetDevice(), mInFlightFence, nullptr);
     }
 
-    void DrawTextureThread::CreateVertexBuffer() {
+    void DrawAttachmentShadingRateThread::CreateVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(mQuadVertices[0]) * mQuadVertices.size();
 
         // 创建临时缓冲
@@ -326,13 +505,13 @@ namespace render {
         vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CleanUpVertexBuffer() {
+    void DrawAttachmentShadingRateThread::CleanUpVertexBuffer() {
         // 销毁顶点缓冲区及显存
         vkDestroyBuffer(RenderBase::GetDevice(), mVertexBuffer, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mVertexBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateIndexBuffer() {
+    void DrawAttachmentShadingRateThread::CreateIndexBuffer() {
         VkDeviceSize bufferSize = sizeof(mQuadIndices[0]) * mQuadIndices.size();
 
         // 创建临时缓冲
@@ -363,12 +542,12 @@ namespace render {
         vkFreeMemory(RenderBase::GetDevice(), stagingBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CleanUpIndexBuffer() {
+    void DrawAttachmentShadingRateThread::CleanUpIndexBuffer() {
         vkDestroyBuffer(RenderBase::GetDevice(), mIndexBuffer, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mIndexBufferMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateTexture() {
+    void DrawAttachmentShadingRateThread::CreateTexture() {
         // 读取图片
         int texWidth, texHeight, texChannels;
         std::string texturePath = setting::dirTexture + std::string("test_texure.jpg");
@@ -455,13 +634,13 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpTexture() {
+    void DrawAttachmentShadingRateThread::CleanUpTexture() {
         vkDestroyImageView(RenderBase::GetDevice(), mTestTextureImageView, nullptr);
         vkDestroyImage(RenderBase::GetDevice(), mTestTextureImage, nullptr);
         vkFreeMemory(RenderBase::GetDevice(), mTestTextureImageMemory, nullptr);
     }
 
-    void DrawTextureThread::CreateTextureSampler() {
+    void DrawAttachmentShadingRateThread::CreateTextureSampler() {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -495,12 +674,12 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpTextureSampler() {
+    void DrawAttachmentShadingRateThread::CleanUpTextureSampler() {
         vkDestroySampler(RenderBase::GetDevice(), mTexureSampler, nullptr);
     }
 
-    void DrawTextureThread::CreateDescriptorPool() {
-        std::vector<VkDescriptorPoolSize> poolSizes = mPipelineDrawTexture->GetDescriptorSize();   // 池中各种类型的Descriptor个数
+    void DrawAttachmentShadingRateThread::CreateDescriptorPool() {
+        std::vector<VkDescriptorPoolSize> poolSizes = mPipelineVariableShadingRate->GetDescriptorSize();   // 池中各种类型的Descriptor个数
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -512,14 +691,14 @@ namespace render {
         }
     }
 
-    void DrawTextureThread::CleanUpDescriptorPool() {
+    void DrawAttachmentShadingRateThread::CleanUpDescriptorPool() {
         vkDestroyDescriptorPool(RenderBase::GetDevice(), mDescriptorPool, nullptr);
     }
 
-    void DrawTextureThread::CreateDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPipelineDrawTexture->GetDescriptorSetLayouts();
+    void DrawAttachmentShadingRateThread::CreateDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPipelineVariableShadingRate->GetDescriptorSetLayouts();
 
-        //// 从池中申请descriptor set
+        // 从池中申请descriptor set
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = mDescriptorPool;		// 从这个池中申请

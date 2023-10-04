@@ -1,8 +1,8 @@
-#ifndef __DRAW_TEXTURE_THREAD__
-#define __DRAW_TEXTURE_THREAD__
+#ifndef __DRAW_PIPELINE_SHADING_RATE_THREAD__
+#define __DRAW_PIPELINE_SHADING_RATE_THREAD__
 
 #include "Thread.h"
-#include "PipelineDrawTexture.h"
+#include "PipelineVariableShadingRate.h"
 #include "RenderPassTest.h"
 #include "RenderBase.h"
 #include "Mesh.h"
@@ -15,10 +15,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace render {
-    class DrawTextureThread : public common::Thread, public RenderBase {
+    class DrawPipelineShadingRateThread : public common::Thread, public RenderBase {
     public:
-        explicit DrawTextureThread(window::WindowTemplate& w);
-        ~DrawTextureThread();
+        explicit DrawPipelineShadingRateThread(window::WindowTemplate& w);
+        ~DrawPipelineShadingRateThread();
 
         void SetFramebufferResized();
 
@@ -26,6 +26,10 @@ namespace render {
         virtual void OnThreadInit() override;
         virtual void OnThreadLoop() override;
         virtual void OnThreadDestroy() override;
+
+        bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) override;
+        std::vector<const char*> FillDeviceExtensions() override;
+        void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
 
     private:
         // ----- render functions -----
@@ -58,13 +62,36 @@ namespace render {
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
 
+        void VkCmdSetFragmentShadingRateKHR(VkInstance instance, VkCommandBuffer commandBuffer,
+            const VkExtent2D* pFragmentSize, const VkFragmentShadingRateCombinerOpKHR combinerOps[2]) {
+            auto func = (PFN_vkCmdSetFragmentShadingRateKHR)vkGetInstanceProcAddr(instance, "vkCmdSetFragmentShadingRateKHR");
+            if (func != nullptr) {
+                func(commandBuffer, pFragmentSize, combinerOps);
+                return;
+            }
+            else {
+                std::runtime_error("vkGetInstanceProcAddr vkCmdSetFragmentShadingRateKHR failed!");
+                return;
+            }
+        }
+
+        VkResult GetPhysicalDeviceFragmentShadingRatesKHR(VkInstance instance, VkPhysicalDevice physicalDevice,
+            uint32_t* pFragmentShadingRateCount, VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates) {
+            auto func = (PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFragmentShadingRatesKHR");
+            if (func != nullptr) {
+                return func(physicalDevice, pFragmentShadingRateCount, pFragmentShadingRates);
+            }
+            else {
+                return VK_ERROR_EXTENSION_NOT_PRESENT;
+            }
+        }
     private:
         bool mFramebufferResized = false;
         std::mutex mFramebufferResizeMutex;
 
         // ---- render objects ----
         RenderPassTest* mRenderPassTest = nullptr;
-        PipelineDrawTexture* mPipelineDrawTexture = nullptr;
+        PipelineVariableShadingRate* mPipelineVariableShadingRate = nullptr;
 
         // depth resources
         VkImage mDepthImage = VK_NULL_HANDLE;
@@ -112,5 +139,5 @@ namespace render {
 }
 
 
-#endif // !__DRAW_TEXTURE_THREAD__
+#endif // !__DRAW_PIPELINE_SHADING_RATE_THREAD__
 

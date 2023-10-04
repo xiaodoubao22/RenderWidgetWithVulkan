@@ -14,10 +14,10 @@ namespace render {
         void CleanUp();
 
         VkRenderPass Get() { return mRenderPass; }
-        std::vector<VkAttachmentDescription>& GetAttachments() { return mAttachments; }
+        std::vector<VkAttachmentDescription2>& GetAttachments() { return mAttachments; }
 
     protected:
-        virtual void FillAttachmentDescriptions(std::vector<VkAttachmentDescription>& attachments) = 0;
+        virtual void FillAttachmentDescriptions(std::vector<VkAttachmentDescription2>& attachments) = 0;
         virtual void CreateRenderPass(VkRenderPass& renderPass) = 0;
 
         PhysicalDevice* GetPhisicalDevice() { return mPhysicalDevice; }
@@ -32,7 +32,7 @@ namespace render {
 
         // renderpass
         VkRenderPass mRenderPass = VK_NULL_HANDLE;
-        std::vector<VkAttachmentDescription> mAttachments;
+        std::vector<VkAttachmentDescription2> mAttachments;
     };
 }
 

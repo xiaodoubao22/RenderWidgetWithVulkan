@@ -1,12 +1,12 @@
-#ifndef __RENDER_PASS_TEST__
-#define __RENDER_PASS_TEST__
+#ifndef __RENDER_PASS_SHADING_RATE__
+#define __RENDER_PASS_SHADING_RATE__
 
 #include "RenderPassTemplate.h"
 namespace render {
-    class RenderPassTest : public RenderPassTemplate {
+    class RenderPassShadingRate : public RenderPassTemplate {
     public:
-        RenderPassTest();
-        ~RenderPassTest();
+        RenderPassShadingRate();
+        ~RenderPassShadingRate();
 
         virtual void FillAttachmentDescriptions(std::vector<VkAttachmentDescription2>& attachments) override;
         virtual void CreateRenderPass(VkRenderPass& renderPass) override;
@@ -19,5 +19,5 @@ namespace render {
 }
 
 
-#endif // !__RENDER_PASS_TEST__
+#endif // !__RENDER_PASS_SHADING_RATE__
 

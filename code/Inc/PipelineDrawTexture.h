@@ -16,8 +16,6 @@ namespace render {
         void CreateShaderModules(ShaderModules& shaderModules) override;
         void CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) override;
         void ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& pipelineInfo) override;
-        void CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& renderPassInfo,
-            VkPipelineLayout pipelineLayout, VkPipeline& graphicsPipeline) override;
     };
 }
 

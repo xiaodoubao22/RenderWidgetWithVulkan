@@ -2,8 +2,7 @@
 #define __WINDOW_IMPL_H__
 
 #include "WindowTemplate.h"
-#include "DrawTriangleThread.h"
-#include "DrawTextureThread.h"
+#include "Thread.h"
 
 namespace window {
     class WindowImpl : public WindowTemplate

@@ -1,19 +1,19 @@
-#include "PipelineDrawTexture.h"
+#include "PipelineVariableShadingRate.h"
 #include "Utils.h"
 #include "Mesh.h"
 
 #include <stdexcept>
 
 namespace render {
-	PipelineDrawTexture::PipelineDrawTexture() {
+	PipelineVariableShadingRate::PipelineVariableShadingRate() {
 
 	}
 
-	PipelineDrawTexture::~PipelineDrawTexture() {
+	PipelineVariableShadingRate::~PipelineVariableShadingRate() {
 
 	}
 
-	std::vector<VkDescriptorPoolSize> PipelineDrawTexture::GetDescriptorSize() {
+	std::vector<VkDescriptorPoolSize> PipelineVariableShadingRate::GetDescriptorSize() {
 		std::vector<VkDescriptorPoolSize> descriptorSize(1);
 		descriptorSize[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		descriptorSize[0].descriptorCount = 1;
@@ -21,7 +21,7 @@ namespace render {
 		return descriptorSize;
 	}
 
-	void PipelineDrawTexture::CreateShaderModules(ShaderModules& shaderModules) {
+	void PipelineVariableShadingRate::CreateShaderModules(ShaderModules& shaderModules) {
 		shaderModules = {};
 
 		// 读取shader
@@ -34,7 +34,7 @@ namespace render {
 		return;
 	}
 
-	void PipelineDrawTexture::CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) {
+	void PipelineVariableShadingRate::CreateDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) {
 		descriptorSetLayouts = std::vector<VkDescriptorSetLayout>(1);
 
 		// descriptor bindings
@@ -55,7 +55,7 @@ namespace render {
 		}
 	}
 
-	void PipelineDrawTexture::ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& configInfo) {
+	void PipelineVariableShadingRate::ConfigPipelineInfo(const ShaderModules& shaderModules, PipeLineConfigInfo& configInfo) {
 		// shader stage
 		VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -167,10 +167,43 @@ namespace render {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
 			VK_DYNAMIC_STATE_LINE_WIDTH,
+			VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR,
 		};
 		configInfo.dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 		configInfo.dynamicStateCreateInfo.dynamicStateCount = configInfo.dynamicStates.size();
 		configInfo.dynamicStateCreateInfo.pDynamicStates = configInfo.dynamicStates.data();
 		return;
+	}
+
+	void PipelineVariableShadingRate::CreatePipeline(const PipeLineConfigInfo& configInfo, const RenderPassInfo& renderPassInfo,
+		VkPipelineLayout pipelineLayout, VkPipeline& graphicsPipeline) {
+		VkPipelineFragmentShadingRateStateCreateInfoKHR shadingRateCreateInfo{};
+		shadingRateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_FRAGMENT_SHADING_RATE_STATE_CREATE_INFO_KHR;
+		shadingRateCreateInfo.fragmentSize = { 4, 4 };
+		shadingRateCreateInfo.combinerOps[0] = VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR;
+		shadingRateCreateInfo.combinerOps[1] = VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR;
+
+		VkGraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineInfo.stageCount = configInfo.shaderStageInfo.size();
+		pipelineInfo.pStages = configInfo.shaderStageInfo.data();
+		pipelineInfo.pVertexInputState = &configInfo.vertexInputInfo;	// fill all of the stage
+		pipelineInfo.pInputAssemblyState = &configInfo.inputAssembly;
+		pipelineInfo.pViewportState = &configInfo.viewportState;
+		pipelineInfo.pRasterizationState = &configInfo.rasterizer;
+		pipelineInfo.pMultisampleState = &configInfo.multisampling;
+		pipelineInfo.pDepthStencilState = &configInfo.depthStencil;
+		pipelineInfo.pColorBlendState = &configInfo.colorBlending;
+		pipelineInfo.pDynamicState = &configInfo.dynamicStateCreateInfo;
+		pipelineInfo.layout = pipelineLayout;
+		pipelineInfo.renderPass = renderPassInfo.renderPass;
+		pipelineInfo.subpass = renderPassInfo.subPassIndex;
+		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;	// pipeline可以继承，减小创建管线的成本 .flags |= VK_PIPELINE_CREATE_DERIVARIVE_BIT
+		pipelineInfo.basePipelineIndex = -1;
+		//pipelineInfo.pNext = &shadingRateCreateInfo;
+		pipelineInfo.pNext = nullptr;
+		if (vkCreateGraphicsPipelines(PipelineTemplate::GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create graphics pipeline!");
+		}
 	}
 }
