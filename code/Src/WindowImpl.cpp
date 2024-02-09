@@ -11,8 +11,8 @@ namespace window {
     {
         //mRenderThread = new render::DrawTriangleThread(*this);
         //mRenderThread = new render::DrawTextureThread(*this);
-        mRenderThread = new render::DrawPipelineShadingRateThread(*this);
-        //mRenderThread = new render::DrawAttachmentShadingRateThread(*this);
+        //mRenderThread = new render::DrawPipelineShadingRateThread(*this);
+        mRenderThread = new render::DrawAttachmentShadingRateThread(*this);
     }
 
     WindowImpl::~WindowImpl() {

@@ -2,10 +2,9 @@
 #define __DRAW_TRIANGLE_THREAD_H__
 
 #include "Thread.h"
-#include "PipelineTest.h"
-#include "RenderPassTest.h"
 #include "RenderBase.h"
 #include "Mesh.h"
+#include "GraphicsPipelineConfig.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -58,10 +57,17 @@ namespace render {
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
 
+        void CreateRenderPasses();
+        void CleanUpRenderPasses();
+
+        void CreatePipelines();
+        void CleanUpPipelines();
+
     private:
         // ---- render objects ----
-        RenderPassTest* mRenderPassTest = nullptr;
-        PipelineTest* mPipelineTest = nullptr;
+        VkFormat mMainDepthFormat = VK_FORMAT_UNDEFINED;
+        VkRenderPass mMainRenderPass = VK_NULL_HANDLE;
+        PipelineComponents mPipeline = {};
 
         // depth resources
         VkImage mDepthImage = VK_NULL_HANDLE;
