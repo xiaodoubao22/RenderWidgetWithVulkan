@@ -13,12 +13,24 @@ find_package(Vulkan REQUIRED)
 include_directories(${GLM_DIR} ${GLFW_DIR}/include ${STB_DIR})
 
 # [RenderWidget]设置头文件路径
-set(RENDER_WIDGET_INC_DIR ${CMAKE_SOURCE_DIR}/Inc)
-file(GLOB RENDER_WIDGET_INC_FILES ./Inc/*.h ./Inc/*.hpp)
+set(RENDER_WIDGET_INC_DIRS
+    ${CMAKE_SOURCE_DIR}/framework/Inc
+    ${CMAKE_SOURCE_DIR}/demo/Inc
+    )
+file(GLOB RENDER_WIDGET_INC_FILES
+    ./framework/Inc/*.h ./framework/Inc/*.hpp
+    ./demo/Inc/*.h ./demo/Inc/*.hpp
+    )
 
 # [RenderWidget]设置源文件路径
-set(RENDER_WIDGET_SRC_DIR ${CMAKE_SOURCE_DIR}/Src)
-file(GLOB RENDER_WIDGET_SRC_FILES ./Src/*.c ./Src/*.cpp)
+set(RENDER_WIDGET_SRC_DIRS
+    ${CMAKE_SOURCE_DIR}/framework/Src
+    ${CMAKE_SOURCE_DIR}/demo/Src
+    )
+file(GLOB RENDER_WIDGET_SRC_FILES
+    ./framework/Src/*.c ./framework/Src/*.cpp
+    ./demo/Src/*.c ./demo/Src/*.cpp
+    )
 
 # -----------render widget-----------
 set(RENDER_WIDGET RenderWidget)
@@ -29,7 +41,7 @@ add_executable(${RENDER_WIDGET}
     )
 # 包含目录
 target_include_directories(${RENDER_WIDGET} PUBLIC 
-    ${RENDER_WIDGET_INC_DIR}
+    ${RENDER_WIDGET_INC_DIRS}
     ${Vulkan_INCLUDE_DIRS}
     )
 # [third_party]链接静态库
@@ -39,9 +51,9 @@ target_link_libraries(${RENDER_WIDGET}
     )
 # 设置VS工程目录
 set(ALL_FILES
-    ${RENDER_WIDGET_INC_DIR}
+    ${RENDER_WIDGET_INC_DIRS}
     ${RENDER_WIDGET_INC_FILES}
-    ${RENDER_WIDGET_SRC_DIR}
+    ${RENDER_WIDGET_SRC_DIRS}
     ${RENDER_WIDGET_SRC_FILES}
     )
 source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${ALL_FILES})
