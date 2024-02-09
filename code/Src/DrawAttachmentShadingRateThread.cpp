@@ -15,17 +15,14 @@ namespace render {
     DrawAttachmentShadingRateThread::DrawAttachmentShadingRateThread(window::WindowTemplate& w) : RenderBase(w)
     {
         mRenderPassShadingRate = new RenderPassShadingRate();
+        mRenderPassTest = new RenderPassTest();
         mPipelineVariableShadingRate = new PipelineVariableShadingRate();
     }
 
     DrawAttachmentShadingRateThread::~DrawAttachmentShadingRateThread() {
         delete mPipelineVariableShadingRate;
+        delete mRenderPassTest;
         delete mRenderPassShadingRate;
-    }
-
-    void DrawAttachmentShadingRateThread::SetFramebufferResized() {
-        std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
-        mFramebufferResized = true;
     }
 
     void DrawAttachmentShadingRateThread::OnThreadInit() {
@@ -34,8 +31,9 @@ namespace render {
         // create render objects
         CreateSyncObjects();
         mRenderPassShadingRate->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
-        mPipelineVariableShadingRate->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(),
-            { mRenderPassShadingRate->Get(), 0 });
+        mRenderPassTest->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
+        RenderPassInfo ps = { mRenderPassShadingRate->GetRenderPass2(), 0 };
+        mPipelineVariableShadingRate->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(), ps);
         mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
         CreateShadingRateTextureResource();
@@ -91,12 +89,9 @@ namespace render {
         }
 
         // 主动重建交换链
-        {
-            std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
-            if (mFramebufferResized) {
-                mFramebufferResized = false;
-                Resize();
-            }
+        if (Thread::IsFbResized()) {
+            Thread::ResetFbResized();
+            Resize();
         }
     }
 
@@ -114,6 +109,7 @@ namespace render {
         CleanUpDepthResources();
         RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
         mPipelineVariableShadingRate->CleanUp();
+        mRenderPassTest->CleanUp();
         mRenderPassShadingRate->CleanUp();
         CleanUpSyncObjects();
 
@@ -204,7 +200,7 @@ namespace render {
         };
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = mRenderPassShadingRate->Get();
+        renderPassInfo.renderPass = mRenderPassShadingRate->GetRenderPass2();
         renderPassInfo.framebuffer = mSwapchainFramebuffers[imageIndex];
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = mSwapchain->GetExtent();
@@ -231,7 +227,7 @@ namespace render {
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
         std::vector<VkExtent2D> shadingRates = { { 1, 1 }, {2, 2}, {4, 4}, {2, 4} };
-        std::vector<VkFragmentShadingRateCombinerOpKHR> combinerOps = { 
+        std::vector<VkFragmentShadingRateCombinerOpKHR> combinerOps = {
             VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR,
             VK_FRAGMENT_SHADING_RATE_COMBINER_OP_MAX_KHR,
         };
@@ -435,7 +431,7 @@ namespace render {
 
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = mRenderPassShadingRate->Get();
+            framebufferInfo.renderPass = mRenderPassShadingRate->GetRenderPass2();
             framebufferInfo.attachmentCount = attachments.size();	// framebuffer的附件个数
             framebufferInfo.pAttachments = attachments.data();								// framebuffer的附件
             framebufferInfo.width = mSwapchain->GetExtent().width;

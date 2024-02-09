@@ -23,11 +23,6 @@ namespace render {
         delete mRenderPassTest;
     }
 
-    void DrawTextureThread::SetFramebufferResized() {
-        std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
-        mFramebufferResized = true;
-    }
-
     void DrawTextureThread::OnThreadInit() {
         RenderBase::Init();
         
@@ -90,12 +85,9 @@ namespace render {
         }
 
         // 主动重建交换链
-        {
-            std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
-            if (mFramebufferResized) {
-                mFramebufferResized = false;
-                Resize();
-            }
+        if (Thread::IsFbResized()) {
+            Thread::ResetFbResized();
+            Resize();
         }
     }
 

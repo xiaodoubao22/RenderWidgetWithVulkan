@@ -3,6 +3,7 @@
 #include "Mesh.h"
 
 #include <stdexcept>
+#include <iostream>
 
 namespace render {
 	PipelineVariableShadingRate::PipelineVariableShadingRate() {

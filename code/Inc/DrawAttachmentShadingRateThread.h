@@ -5,6 +5,7 @@
 //#include "PipelineDrawTexture.h"
 #include "PipelineVariableShadingRate.h"
 #include "RenderPassShadingRate.h"
+#include "RenderPassTest.h"
 #include "RenderBase.h"
 #include "Mesh.h"
 
@@ -20,8 +21,6 @@ namespace render {
     public:
         explicit DrawAttachmentShadingRateThread(window::WindowTemplate& w);
         ~DrawAttachmentShadingRateThread();
-
-        void SetFramebufferResized();
 
     private:
         virtual void OnThreadInit() override;
@@ -90,10 +89,8 @@ namespace render {
             }
         }
     private:
-        bool mFramebufferResized = false;
-        std::mutex mFramebufferResizeMutex;
-
         // ---- render objects ----
+        RenderPassTest* mRenderPassTest = nullptr;
         RenderPassShadingRate* mRenderPassShadingRate = nullptr;
         PipelineVariableShadingRate* mPipelineVariableShadingRate = nullptr;
 

@@ -2,6 +2,7 @@
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
+#include "VulkanInitializers.h"
 
 #include <chrono>
 #include <iostream>
@@ -14,18 +15,9 @@
 namespace render {
     DrawPipelineShadingRateThread::DrawPipelineShadingRateThread(window::WindowTemplate& w) : RenderBase(w)
     {
-        mRenderPassTest = new RenderPassTest();
-        mPipelineVariableShadingRate = new PipelineVariableShadingRate();
     }
 
     DrawPipelineShadingRateThread::~DrawPipelineShadingRateThread() {
-        delete mPipelineVariableShadingRate;
-        delete mRenderPassTest;
-    }
-
-    void DrawPipelineShadingRateThread::SetFramebufferResized() {
-        std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
-        mFramebufferResized = true;
     }
 
     void DrawPipelineShadingRateThread::OnThreadInit() {
@@ -33,9 +25,8 @@ namespace render {
 
         // create render objects
         CreateSyncObjects();
-        mRenderPassTest->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
-        mPipelineVariableShadingRate->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(),
-            { mRenderPassTest->Get(), 0 });
+        CreateRenderPasses();
+        CreatePipelines();
         mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
         CreateDepthResources();
         CreateFramebuffers();
@@ -90,12 +81,9 @@ namespace render {
         }
 
         // 主动重建交换链
-        {
-            std::unique_lock<std::mutex> lock(mFramebufferResizeMutex);
-            if (mFramebufferResized) {
-                mFramebufferResized = false;
-                Resize();
-            }
+        if (Thread::IsFbResized()) {
+            Thread::ResetFbResized();
+            Resize();
         }
     }
 
@@ -111,8 +99,8 @@ namespace render {
         CleanUpFramebuffers();
         CleanUpDepthResources();
         RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
-        mPipelineVariableShadingRate->CleanUp();
-        mRenderPassTest->CleanUp();
+        CleanUpPipelines();
+        CleanUpRenderPasses();
         CleanUpSyncObjects();
 
         // destroy basic objects
@@ -202,7 +190,7 @@ namespace render {
         };
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = mRenderPassTest->Get();
+        renderPassInfo.renderPass = mMainRenderPass;
         renderPassInfo.framebuffer = mSwapchainFramebuffers[imageIndex];
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = mSwapchain->GetExtent();
@@ -211,7 +199,7 @@ namespace render {
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         // 绑定Pipeline
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineVariableShadingRate->GetPipeline());
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPieplineVrs.pipeline);
 
         // dynamic states:
         VkViewport viewport{};
@@ -238,7 +226,7 @@ namespace render {
 
         // 绑定DescriptorSet
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            mPipelineVariableShadingRate->GetPipelineLayout(),
+            mPieplineVrs.layout,
             0, 1, &mDescriptorSet,
             0, nullptr);
 
@@ -282,7 +270,7 @@ namespace render {
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
-        imageInfo.format = mRenderPassTest->GetDepthFormat();
+        imageInfo.format = mMainDepthFormat;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;		// 可选TILING_LINEAR:行优先 TILLING_OPTIMAL:一种容易访问的结构
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -296,7 +284,7 @@ namespace render {
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = mDepthImage;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = mRenderPassTest->GetDepthFormat();
+        viewInfo.format = mMainDepthFormat;
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
@@ -331,7 +319,7 @@ namespace render {
 
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = mRenderPassTest->Get();
+            framebufferInfo.renderPass = mMainRenderPass;
             framebufferInfo.attachmentCount = attachments.size();	// framebuffer的附件个数
             framebufferInfo.pAttachments = attachments.data();								// framebuffer的附件
             framebufferInfo.width = mSwapchain->GetExtent().width;
@@ -592,8 +580,115 @@ namespace render {
         vkDestroySampler(RenderBase::GetDevice(), mTexureSampler, nullptr);
     }
 
+    void DrawPipelineShadingRateThread::CreateRenderPasses()
+    {
+        // subpass
+        VkAttachmentReference2 colorAttachmentRef =
+            vulkanInitializers::AttachmentReference2(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        VkAttachmentReference2 depthAttachmentRef =
+            vulkanInitializers::AttachmentReference2(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+        std::vector<VkSubpassDescription2> subpasses = {
+            vulkanInitializers::SubpassDescription2(VK_PIPELINE_BIND_POINT_GRAPHICS, &colorAttachmentRef, &depthAttachmentRef),
+        };
+
+        std::vector<VkSubpassDependency2> dependencys = { vulkanInitializers::SubpassDependency2(VK_SUBPASS_EXTERNAL, 0) };
+        dependencys[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependencys[0].srcAccessMask = 0;
+        dependencys[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependencys[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        // 查找合适的深度缓冲格式
+        mMainDepthFormat = RenderBase::FindSupportedFormat(
+            { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+            VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+        std::vector<VkAttachmentDescription2> mAttachments2(2);
+        // 颜色附件
+        mAttachments2[0] = vulkanInitializers::AttachmentDescription2(mSwapchain->GetFormat());
+        vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[0],
+            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+        vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[0],
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        // 深度附件
+        mAttachments2[1] = vulkanInitializers::AttachmentDescription2(mMainDepthFormat);
+        vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[1],
+            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+        vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[1],
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+        VkRenderPassCreateInfo2 renderPassInfo = vulkanInitializers::RenderPassCreateInfo2(mAttachments2, subpasses);
+        vulkanInitializers::RenderPassCreateInfo2SetArray(renderPassInfo, dependencys);
+        if (vkCreateRenderPass2(RenderBase::mDevice->Get(), &renderPassInfo, nullptr, &mMainRenderPass) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create render pass!");
+        }
+
+    }
+
+    void DrawPipelineShadingRateThread::CleanUpRenderPasses()
+    {
+        vkDestroyRenderPass(RenderBase::mDevice->Get(), mMainRenderPass, nullptr);
+    }
+
+    void DrawPipelineShadingRateThread::CreatePipelines()
+    {
+        // create shader
+        ShaderModuleFactory& shaderFactory = ShaderModuleFactory::GetInstance();
+        std::vector<SpvFilePath> shaderFilePaths = {
+            { setting::dirSpvFiles + std::string("DrawTextureTestVert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
+            { setting::dirSpvFiles + std::string("DrawTextureTestFrag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
+        };
+        ShaderProgram spDrawTexture = shaderFactory.CreateShaderProgramFromFiles(RenderBase::GetDevice(), shaderFilePaths);
+        
+        // descriptor size
+        mPieplineVrs.descriptorSizes = { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 } };
+        
+        // descriptor layout
+        mPieplineVrs.descriptorSetLayouts.resize(1);
+        std::vector<VkDescriptorSetLayoutBinding> layoutBindings = {
+            vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
+        };
+        VkDescriptorSetLayoutCreateInfo layoutInfo = vulkanInitializers::DescriptorSetLayoutCreateInfo(layoutBindings);
+        if (vkCreateDescriptorSetLayout(RenderBase::GetDevice(), &layoutInfo, nullptr, &mPieplineVrs.descriptorSetLayouts[0]) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+
+        // pipeline layout
+        VkPipelineLayoutCreateInfo layoutCreateInfo = vulkanInitializers::PipelineLayoutCreateInfo(
+            mPieplineVrs.descriptorSetLayouts, mPieplineVrs.pushConstantRanges);
+        if (vkCreatePipelineLayout(RenderBase::GetDevice(), &layoutCreateInfo, nullptr, &mPieplineVrs.layout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create pipline layout!");
+        }
+
+        // pipeline
+        GraphicsPipelineConfigBase configInfo;
+        configInfo.Fill();
+        configInfo.AddDynamicState(VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR);
+        configInfo.SetVertexInputBindings({ Vertex2DColorTexture::GetBindingDescription() });
+        configInfo.SetVertexInputAttributes(Vertex2DColorTexture::getAttributeDescriptions());
+        VkGraphicsPipelineCreateInfo pipelineCreateInfo = configInfo.Populate(mPieplineVrs.layout, mMainRenderPass);
+        pipelineCreateInfo.stageCount = spDrawTexture.shaderStageInfos.size();
+        pipelineCreateInfo.pStages = spDrawTexture.shaderStageInfos.data();
+        if (vkCreateGraphicsPipelines(RenderBase::GetDevice(), VK_NULL_HANDLE, 1,
+            &pipelineCreateInfo, nullptr, &mPieplineVrs.pipeline) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create graphics pipeline!");
+        }
+        
+        // destroy shader
+        shaderFactory.DestroyShaderProgram(spDrawTexture);
+    }
+
+    void DrawPipelineShadingRateThread::CleanUpPipelines()
+    {
+        vkDestroyPipeline(RenderBase::GetDevice(), mPieplineVrs.pipeline, nullptr);
+        vkDestroyPipelineLayout(RenderBase::GetDevice(), mPieplineVrs.layout, nullptr);
+        for (auto setLayout : mPieplineVrs.descriptorSetLayouts) {
+            vkDestroyDescriptorSetLayout(mDevice->Get(), setLayout, nullptr);
+        }
+    }
+
     void DrawPipelineShadingRateThread::CreateDescriptorPool() {
-        std::vector<VkDescriptorPoolSize> poolSizes = mPipelineVariableShadingRate->GetDescriptorSize();   // 池中各种类型的Descriptor个数
+        std::vector<VkDescriptorPoolSize> poolSizes = mPieplineVrs.descriptorSizes;   // 池中各种类型的Descriptor个数
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -610,7 +705,7 @@ namespace render {
     }
 
     void DrawPipelineShadingRateThread::CreateDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPipelineVariableShadingRate->GetDescriptorSetLayouts();
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = mPieplineVrs.descriptorSetLayouts;
 
         //// 从池中申请descriptor set
         VkDescriptorSetAllocateInfo allocInfo{};

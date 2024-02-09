@@ -1,5 +1,6 @@
 #include "PipelineTemplate.h"
 #include <stdexcept>
+#include <iostream>
 
 namespace render {
     PipelineTemplate::PipelineTemplate() {
@@ -27,17 +28,20 @@ namespace render {
         // pipeline
         PipeLineConfigInfo configInfo{};
         ConfigPipelineInfo(mShaders, configInfo);
+        std::cout << "init 000" << std::endl;
         CreatePipeline(configInfo, renderPassInfo, mPipelineLayout, mGraphicsPipeline);
 
         // destroy shaders
         DestroyShaderModules();
+
+
     }
 
     void PipelineTemplate::CleanUp() {
         vkDestroyPipeline(mDevice->Get(), mGraphicsPipeline, nullptr);
 
         vkDestroyPipelineLayout(mDevice->Get(), mPipelineLayout, nullptr);
-        
+
         for (auto setLayout : mDescriptorSetLayouts) {
             vkDestroyDescriptorSetLayout(mDevice->Get(), setLayout, nullptr);
         }

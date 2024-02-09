@@ -34,6 +34,10 @@ namespace render {
         bool CheckExtensionSupport(const std::vector<const char*>& target);
 
     protected:
+        VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates,
+            VkImageTiling tiling, VkFormatFeatureFlags features);
+
+    protected:
         bool mEnableValidationLayer = false;
 
         // ---- externel objects ----

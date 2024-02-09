@@ -30,6 +30,26 @@ namespace common {
         mThread.join();
     }
 
+    void Thread::PushData(std::string& lable, void* data)
+    {
+        return;
+    }
+
+    void Thread::SetFbResized()
+    {
+        mFramebufferResized.store(true);
+    }
+
+    void Thread::ResetFbResized()
+    {
+        mFramebufferResized.store(false);
+    }
+
+    bool Thread::IsFbResized()
+    {
+        return mFramebufferResized.load();
+    }
+
     void Thread::ThreadFunction() {
         OnThreadInit();
 
@@ -52,4 +72,5 @@ namespace common {
 
         OnThreadDestroy();
     }
+
 }

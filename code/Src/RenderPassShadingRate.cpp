@@ -1,4 +1,5 @@
 #include "RenderPassShadingRate.h"
+#include "VulkanInitializers.h"
 
 #include <stdexcept>
 #include <iostream>
@@ -21,7 +22,7 @@ namespace render {
 		// 颜色附件
 		attachments[0].format = GetSwapchain()->GetFormat();		// 格式
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;				// 多重采样
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;				// 渲染前清屏
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;			// 渲染前清屏
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;				// 渲染后储存
 		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;		// 模板操作此处不用
 		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 模板操作此处不用
@@ -30,7 +31,7 @@ namespace render {
 		// 深度附件
 		attachments[1].format = mDepthFormat;
 		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;		// 渲染前清屏
+		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;		// 渲染前清屏
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 渲染后不关心
 		attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// 模板操作此处不用
 		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;	// 模板操作此处不用
@@ -49,54 +50,56 @@ namespace render {
 
 	void RenderPassShadingRate::CreateRenderPass(VkRenderPass& renderPass) {
 		// subpass
-		VkAttachmentReference2 colorAttachmentRef{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2 };
-		colorAttachmentRef.attachment = 0;	// attachment的下标，第0个
-		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VkAttachmentReference2 colorAttachmentRef =
+			vulkanInitializers::AttachmentReference2(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VkAttachmentReference2 depthAttachmentRef =
+			vulkanInitializers::AttachmentReference2(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+		VkAttachmentReference2 shadingRateAttachment =
+			vulkanInitializers::AttachmentReference2(2, VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR);
+		VkFragmentShadingRateAttachmentInfoKHR shadingRateAttachmentInfo =
+			vulkanInitializers::FragmentShadingRateAttachmentInfoKHR(&shadingRateAttachment, { 16, 16 });
 
-		VkAttachmentReference2 depthAttachmentRef{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2 };
-		depthAttachmentRef.attachment = 1;
-		depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentReference2 shadingRateAttachment{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2 };
-		shadingRateAttachment.attachment = 2;
-		shadingRateAttachment.layout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;
-
-		VkFragmentShadingRateAttachmentInfoKHR shadingRateAttachmentInfo{};
-		shadingRateAttachmentInfo.sType = VK_STRUCTURE_TYPE_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR;
-		shadingRateAttachmentInfo.pFragmentShadingRateAttachment = &shadingRateAttachment;
-		shadingRateAttachmentInfo.shadingRateAttachmentTexelSize = { 16, 16 };
-
-		std::vector<VkSubpassDescription2> subpasses(1, { VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2 });	// 一个subpass
-		subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpasses[0].colorAttachmentCount = 1;
-		subpasses[0].pColorAttachments = &colorAttachmentRef;		// 颜色缓冲
-		subpasses[0].pDepthStencilAttachment = &depthAttachmentRef;	// 深度缓冲
-		subpasses[0].pInputAttachments = nullptr;
-		subpasses[0].pResolveAttachments = nullptr;
-		subpasses[0].pPreserveAttachments = nullptr;
+		std::vector<VkSubpassDescription2> subpasses = {
+			vulkanInitializers::SubpassDescription2(VK_PIPELINE_BIND_POINT_GRAPHICS, &colorAttachmentRef, &depthAttachmentRef),
+		};
 		subpasses[0].pNext = &shadingRateAttachmentInfo;
 
-		std::vector<VkSubpassDependency2> dependencys(1, { VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2 });
-		dependencys[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-		dependencys[0].dstSubpass = 0;
-		dependencys[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		std::vector<VkSubpassDependency2> dependencys = { vulkanInitializers::SubpassDependency2(VK_SUBPASS_EXTERNAL, 0) };
+		dependencys[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 		dependencys[0].srcAccessMask = 0;
-		dependencys[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-		dependencys[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dependencys[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		dependencys[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-		VkRenderPassCreateInfo2 renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2 };
-		renderPassInfo.attachmentCount = GetAttachments().size();
-		renderPassInfo.pAttachments = GetAttachments().data();
-		renderPassInfo.subpassCount = subpasses.size();
-		renderPassInfo.pSubpasses = subpasses.data();
-		renderPassInfo.dependencyCount = dependencys.size();
-		renderPassInfo.pDependencies = dependencys.data();
+		// 查找合适的深度缓冲格式
+		mDepthFormat = GetPhisicalDevice()->FindSupportedFormat(
+			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-		if (vkCreateRenderPass2(GetDevice()->Get(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+		std::vector<VkAttachmentDescription2> mAttachments2(3);
+		// 颜色附件
+		mAttachments2[0] = vulkanInitializers::AttachmentDescription2(GetSwapchain()->GetFormat());
+		vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[0],
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+		vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[0],
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		// 深度附件
+		mAttachments2[1] = vulkanInitializers::AttachmentDescription2(mDepthFormat);
+		vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[1],
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+		vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[1],
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+		// shading rate附件
+		mAttachments2[2] = vulkanInitializers::AttachmentDescription2(VK_FORMAT_R8_UINT);
+		vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[2],
+			VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+		vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[2],
+			VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR, VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR);
+
+		VkRenderPassCreateInfo2 renderPassInfo = vulkanInitializers::RenderPassCreateInfo2(mAttachments2, subpasses);
+		vulkanInitializers::RenderPassCreateInfo2SetArray(renderPassInfo, dependencys);
+		if (vkCreateRenderPass2(GetDevice()->Get(), &renderPassInfo, nullptr, &mRenderPass2) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create render pass!");
 		}
+		std::cout << "creaate mRenderPass2 success " << mRenderPass2 << std::endl;
 	}
 }

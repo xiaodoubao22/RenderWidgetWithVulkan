@@ -94,7 +94,7 @@ namespace render {
         // 检查需要的拓展
         std::cout << "--------- check extensions used by instance ----------\n";
         auto extensions = mWindow.QueryWindowRequiredExtensions();
-        if (mEnableValidationLayer) {
+        if (mEnableValidationLayer){
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
         extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -134,7 +134,6 @@ namespace render {
             mEnableValidationLayer = false;
             return;
         }
-
         // 获取支持的层
         uint32_t layerCount;
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -149,6 +148,7 @@ namespace render {
 
         // 检查
         utils::PrintStringList(consts::validationLayers, "validationLayers:");
+        utils::PrintStringList(availableLayerNames, "availableLayers:");
         if (utils::CheckSupported(consts::validationLayers, availableLayerNames)) {
             std::cout << "validation layers are all supported" << std::endl;
             mEnableValidationLayer = true;
@@ -176,6 +176,23 @@ namespace render {
 
         // 检查
         return utils::CheckSupported(target, supportExtensionNames);
+    }
+
+    VkFormat RenderBase::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+        if (mPhysicalDevice->Get() == VK_NULL_HANDLE) {
+            throw std::runtime_error("mPhysicalDevice is null");
+        }
+        for (VkFormat format : candidates) {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(mPhysicalDevice->Get(), format, &props);
+            if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+                return format;
+            }
+            else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+                return format;
+            }
+        }
+        throw std::runtime_error("failed to find supported format!");
     }
 }
 

@@ -20,8 +20,6 @@ namespace render {
         explicit DrawTextureThread(window::WindowTemplate& w);
         ~DrawTextureThread();
 
-        void SetFramebufferResized();
-
     private:
         virtual void OnThreadInit() override;
         virtual void OnThreadLoop() override;
@@ -59,9 +57,6 @@ namespace render {
         void CreateDescriptorSets();
 
     private:
-        bool mFramebufferResized = false;
-        std::mutex mFramebufferResizeMutex;
-
         // ---- render objects ----
         RenderPassTest* mRenderPassTest = nullptr;
         PipelineDrawTexture* mPipelineDrawTexture = nullptr;

@@ -6,6 +6,8 @@
 #include "RenderPassTest.h"
 #include "RenderBase.h"
 #include "Mesh.h"
+#include "GraphicsPipelineConfig.h"
+#include "ShaderModuleFactory.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -19,8 +21,6 @@ namespace render {
     public:
         explicit DrawPipelineShadingRateThread(window::WindowTemplate& w);
         ~DrawPipelineShadingRateThread();
-
-        void SetFramebufferResized();
 
     private:
         virtual void OnThreadInit() override;
@@ -36,7 +36,7 @@ namespace render {
         void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
         void Resize();
 
-        // ----- create and clean up ----- 
+        // ----- create and clean up -----
         void CreateDepthResources();
         void CleanUpDepthResources();
 
@@ -57,6 +57,12 @@ namespace render {
 
         void CreateTextureSampler();
         void CleanUpTextureSampler();
+
+        void CreateRenderPasses();
+        void CleanUpRenderPasses();
+
+        void CreatePipelines();
+        void CleanUpPipelines();
 
         void CreateDescriptorPool();
         void CleanUpDescriptorPool();
@@ -86,12 +92,10 @@ namespace render {
             }
         }
     private:
-        bool mFramebufferResized = false;
-        std::mutex mFramebufferResizeMutex;
-
         // ---- render objects ----
-        RenderPassTest* mRenderPassTest = nullptr;
-        PipelineVariableShadingRate* mPipelineVariableShadingRate = nullptr;
+        VkFormat mMainDepthFormat;
+        VkRenderPass mMainRenderPass = VK_NULL_HANDLE;
+        PipelineComponents mPieplineVrs = {};
 
         // depth resources
         VkImage mDepthImage = VK_NULL_HANDLE;

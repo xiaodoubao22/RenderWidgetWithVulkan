@@ -13,8 +13,11 @@ namespace render {
 
         VkFormat GetDepthFormat() { return mDepthFormat; }
 
+        VkRenderPass GetRenderPass2() { return mRenderPass2; }
+
     private:
         VkFormat mDepthFormat = VK_FORMAT_UNDEFINED;
+        VkRenderPass mRenderPass2 = VK_NULL_HANDLE;
     };
 }
 
