@@ -18,7 +18,7 @@ namespace window {
         virtual void OnFramebufferResized(int width, int height) override;
 
     private:
-        common::Thread* mRenderThread = nullptr;
+        render::Thread* mRenderThread = nullptr;
 
         bool mIsMinimized = false;
     };

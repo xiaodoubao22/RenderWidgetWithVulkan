@@ -3,9 +3,10 @@
 #include "Utils.h"
 #include "DebugUtils.h"
 #include "VulkanInitializers.h"
+#include "AppDispatchTable.h"
+#include "Log.h"
 
 #include <chrono>
-#include <iostream>
 #include <stdexcept>
 #include <array>
 #include <bitset>
@@ -108,7 +109,7 @@ namespace render {
     }
 
     bool DrawPipelineShadingRateThread::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
-        std::cout << "DrawPipelineShadingRateThread::PhysicalDeviceSelectionCondition" << std::endl;
+        LOGI("DrawPipelineShadingRateThread::PhysicalDeviceSelectionCondition");
         return true;
     }
 
@@ -137,10 +138,10 @@ namespace render {
         physicalDeviceFeatures2.pNext = &physicalDeviceFSRFeatures;
         vkGetPhysicalDeviceFeatures2(physicalDevice->Get(), &physicalDeviceFeatures2);
 
-        std::cout << "physicalDeviceFSRFeatures : "
-            << physicalDeviceFSRFeatures.attachmentFragmentShadingRate << " "
-            << physicalDeviceFSRFeatures.pipelineFragmentShadingRate << " "
-            << physicalDeviceFSRFeatures.primitiveFragmentShadingRate << std::endl;
+        LOGI("physicalDeviceFSRFeatures : %d %d %d",
+            physicalDeviceFSRFeatures.attachmentFragmentShadingRate,
+            physicalDeviceFSRFeatures.pipelineFragmentShadingRate,
+            physicalDeviceFSRFeatures.primitiveFragmentShadingRate);
 
         // properties
         VkPhysicalDeviceFragmentShadingRatePropertiesKHR physicalDeviceFSRProperties{
@@ -150,25 +151,26 @@ namespace render {
         physicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
         physicalDeviceProperties2.pNext = &physicalDeviceFSRProperties;
         vkGetPhysicalDeviceProperties2(physicalDevice->Get(), &physicalDeviceProperties2);
-        std::cout << "physicalDeviceFSRProperties : "
-            << "(" << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width << ", "
-            << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height << ") "
-            << "(" << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width << ", "
-            << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height << ") "
-            << "(" << physicalDeviceFSRProperties.maxFragmentSizeAspectRatio << ")\n";
+        LOGI("physicalDeviceFSRProperties : (%d, %d) (%d, %d) %d",
+            physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width,
+            physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height,
+            physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width,
+            physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height,
+            physicalDeviceFSRProperties.maxFragmentSizeAspectRatio);
 
         // availiable shading rate
+        AppDispatchTable& dispatchTable = AppDispatchTable::GetInstance();
         uint32_t availiableShadingRateSize = 0;
         std::vector<VkPhysicalDeviceFragmentShadingRateKHR> availiableShadingRate(0);
-        VkResult res = GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, nullptr);
+        VkResult res = dispatchTable.GetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice->Get(), &availiableShadingRateSize, nullptr);
         if (availiableShadingRateSize != 0 && res == VK_SUCCESS) {
             availiableShadingRate.resize(availiableShadingRateSize, { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR });
-            GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, availiableShadingRate.data());
+            dispatchTable.GetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice->Get(),&availiableShadingRateSize, availiableShadingRate.data());
         }
 
         for (VkPhysicalDeviceFragmentShadingRateKHR& shadingRate : availiableShadingRate) {
-            std::cout << std::bitset<sizeof(VkSampleCountFlags) * 8>(shadingRate.sampleCounts)
-                << " (" << shadingRate.fragmentSize.width << "," << shadingRate.fragmentSize.height << ")" << std::endl;
+            LOGI("%x (%d, %d)", shadingRate.sampleCounts,
+                shadingRate.fragmentSize.width, shadingRate.fragmentSize.height);
         }
         // **********************************************************************
     }
@@ -180,7 +182,7 @@ namespace render {
         beginInfo.flags = 0;
         beginInfo.pInheritanceInfo = nullptr;
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-            throw std::runtime_error("fiaile to begin recording command buffer!");
+            throw std::runtime_error("faile to begin recording command buffer!");
         }
 
         // 启动Pass
@@ -235,8 +237,8 @@ namespace render {
         std::vector<VkFragmentShadingRateCombinerOpKHR> combinerOps(2, VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR);
         for (int i = 0; i < 4; i++) {
             // 每个draw call用不同的shading rate
-            VkCmdSetFragmentShadingRateKHR(RenderBase::mInstance,
-                commandBuffer, &shadingRates[i], combinerOps.data());
+            AppDispatchTable::GetInstance().CmdSetFragmentShadingRateKHR(commandBuffer,
+                &shadingRates[i], combinerOps.data());
             vkCmdDrawIndexed(commandBuffer, mQuadIndices.size(), 1, i * mQuadIndices.size(), 0, 0);
         }
 

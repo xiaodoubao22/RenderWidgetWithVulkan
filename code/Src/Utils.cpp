@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include "Log.h"
 
 #include <iostream>
 #include <unordered_set>
@@ -25,20 +26,20 @@ namespace utils {
 	}
 
 	void PrintStringList(const std::vector<std::string>& stringList, const std::string& head) {
-		std::cout << head << std::endl;
+		LOGI("%s", head.c_str());
 		for (int i = 0; i < stringList.size(); i++) {
-			std::cout << "  - " << stringList[i] << std::endl;
+			LOGI("  - %s", stringList[i].c_str());
 		}
-		std::cout << "  - end\n";
+		LOGI("  - end");
 		return;
 	}
 
 	void PrintStringList(const std::vector<const char*>& stringList, const std::string& head) {
-		std::cout << head << std::endl;
+		LOGI("%s", head.c_str());
 		for (int i = 0; i < stringList.size(); i++) {
-			std::cout << "  - " << stringList[i] << std::endl;
+			LOGI("  - %s", stringList[i]);
 		}
-		std::cout << "  - end\n";
+		LOGI("  - end");
 		return;
 	}
 
@@ -63,7 +64,7 @@ namespace utils {
 		std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
 		if (!file.is_open()) {
-			std::cerr << "filed to open shader file: " << filename << std::endl;
+			LOGE("filed to open shader file: %s", filename.c_str());
 			throw std::runtime_error("filed to open shader file!");
 		}
 

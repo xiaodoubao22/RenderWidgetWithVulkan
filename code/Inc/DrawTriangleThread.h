@@ -19,7 +19,7 @@ namespace window {
 }
 
 namespace render {
-    class DrawTriangleThread : public common::Thread, public RenderBase {
+    class DrawTriangleThread : public Thread, public RenderBase {
     public:
         explicit DrawTriangleThread(window::WindowTemplate& w);
         ~DrawTriangleThread();

@@ -15,7 +15,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace render {
-    class DrawTextureThread : public common::Thread, public RenderBase {
+    class DrawTextureThread : public Thread, public RenderBase {
     public:
         explicit DrawTextureThread(window::WindowTemplate& w);
         ~DrawTextureThread();

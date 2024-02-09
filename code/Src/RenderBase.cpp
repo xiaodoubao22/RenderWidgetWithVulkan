@@ -1,11 +1,12 @@
 #include "RenderBase.h"
 
-#include <iostream>
 #include <array>
+#include <Log.h>
 
 #include "Utils.h"
 #include "DebugUtils.h"
 #include "WindowTemplate.h"
+#include "AppDispatchTable.h"
 
 namespace render {
     RenderBase::RenderBase(window::WindowTemplate& w) : mWindow(w)
@@ -27,6 +28,7 @@ namespace render {
 
         // instance
         CreateInstance();
+        AppDispatchTable::GetInstance().InitInstance(mInstance);
 
         // debug utils
         if (setting::enableValidationLayer) {
@@ -49,6 +51,7 @@ namespace render {
         }
         RequestPhysicalDeviceFeatures(mPhysicalDevice);
         mDevice->Init(mPhysicalDevice);
+        AppDispatchTable::GetInstance().InitDevice(mDevice->Get());
 
         // swapchain
         mSwapchain->Init(mPhysicalDevice, mDevice, mWindow.GetWindowExtent(), mSurface);
@@ -69,7 +72,7 @@ namespace render {
     }
 
     bool RenderBase::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
-        std::cout << "No additional conditions on choosing physical device\n";
+        LOGI("No additional conditions on choosing physical device");
         return true;
     }
 
@@ -78,7 +81,7 @@ namespace render {
     }
 
     void RenderBase::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {
-        std::cout << "Did not request any physical device features\n";
+        LOGI("Did not request any physical device features");
         return;
     }
 
@@ -92,7 +95,7 @@ namespace render {
         appInfo.apiVersion = VK_API_VERSION_1_2;
 
         // 检查需要的拓展
-        std::cout << "--------- check extensions used by instance ----------\n";
+        LOGI("--------- check extensions used by instance ----------");
         auto extensions = mWindow.QueryWindowRequiredExtensions();
         if (mEnableValidationLayer){
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -103,7 +106,7 @@ namespace render {
             throw std::runtime_error("extension not all supported!");
         }
         else {
-            std::cout << "-------- instance extensions are all supported --------\n\n";
+            LOGI("-------- instance extensions are all supported --------");
         }
 
         VkInstanceCreateInfo createInfo{};
@@ -130,7 +133,7 @@ namespace render {
 
     void RenderBase::CheckValidationLayerSupport(bool enableValidationLayer) {
         if (enableValidationLayer == false) {
-            std::cout << "validation layer disabled" << std::endl;
+            LOGI("validation layer disabled");
             mEnableValidationLayer = false;
             return;
         }
@@ -150,11 +153,11 @@ namespace render {
         utils::PrintStringList(consts::validationLayers, "validationLayers:");
         utils::PrintStringList(availableLayerNames, "availableLayers:");
         if (utils::CheckSupported(consts::validationLayers, availableLayerNames)) {
-            std::cout << "validation layers are all supported" << std::endl;
+            LOGI("validation layers are all supported");
             mEnableValidationLayer = true;
         }
         else {
-            std::cerr << "validation layer enabled but not supported" << std::endl;
+            LOGE("validation layer enabled but not supported");
             mEnableValidationLayer = false;
         }
         return;

@@ -17,7 +17,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace render {
-    class DrawAttachmentShadingRateThread : public common::Thread, public RenderBase {
+    class DrawAttachmentShadingRateThread : public Thread, public RenderBase {
     public:
         explicit DrawAttachmentShadingRateThread(window::WindowTemplate& w);
         ~DrawAttachmentShadingRateThread();
@@ -65,32 +65,8 @@ namespace render {
         void CleanUpDescriptorPool();
         void CreateDescriptorSets();
 
-        void VkCmdSetFragmentShadingRateKHR(VkInstance instance, VkCommandBuffer commandBuffer,
-            const VkExtent2D* pFragmentSize, const VkFragmentShadingRateCombinerOpKHR combinerOps[2]) {
-            auto func = (PFN_vkCmdSetFragmentShadingRateKHR)vkGetInstanceProcAddr(instance, "vkCmdSetFragmentShadingRateKHR");
-            if (func != nullptr) {
-                func(commandBuffer, pFragmentSize, combinerOps);
-                return;
-            }
-            else {
-                std::runtime_error("vkGetInstanceProcAddr vkCmdSetFragmentShadingRateKHR failed!");
-                return;
-            }
-        }
-
-        VkResult GetPhysicalDeviceFragmentShadingRatesKHR(VkInstance instance, VkPhysicalDevice physicalDevice,
-            uint32_t* pFragmentShadingRateCount, VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates) {
-            auto func = (PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFragmentShadingRatesKHR");
-            if (func != nullptr) {
-                return func(physicalDevice, pFragmentShadingRateCount, pFragmentShadingRates);
-            }
-            else {
-                return VK_ERROR_EXTENSION_NOT_PRESENT;
-            }
-        }
     private:
         // ---- render objects ----
-        RenderPassTest* mRenderPassTest = nullptr;
         RenderPassShadingRate* mRenderPassShadingRate = nullptr;
         PipelineVariableShadingRate* mPipelineVariableShadingRate = nullptr;
 

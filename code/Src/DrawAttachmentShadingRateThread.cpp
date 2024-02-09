@@ -2,9 +2,10 @@
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
+#include "AppDispatchTable.h"
+#include "Log.h"
 
 #include <chrono>
-#include <iostream>
 #include <stdexcept>
 #include <array>
 #include <bitset>
@@ -15,13 +16,11 @@ namespace render {
     DrawAttachmentShadingRateThread::DrawAttachmentShadingRateThread(window::WindowTemplate& w) : RenderBase(w)
     {
         mRenderPassShadingRate = new RenderPassShadingRate();
-        mRenderPassTest = new RenderPassTest();
         mPipelineVariableShadingRate = new PipelineVariableShadingRate();
     }
 
     DrawAttachmentShadingRateThread::~DrawAttachmentShadingRateThread() {
         delete mPipelineVariableShadingRate;
-        delete mRenderPassTest;
         delete mRenderPassShadingRate;
     }
 
@@ -31,7 +30,6 @@ namespace render {
         // create render objects
         CreateSyncObjects();
         mRenderPassShadingRate->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
-        mRenderPassTest->Init(RenderBase::mPhysicalDevice, RenderBase::mDevice, RenderBase::mSwapchain);
         RenderPassInfo ps = { mRenderPassShadingRate->GetRenderPass2(), 0 };
         mPipelineVariableShadingRate->Init(RenderBase::mDevice, RenderBase::mWindow.GetWindowExtent(), ps);
         mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
@@ -109,7 +107,6 @@ namespace render {
         CleanUpDepthResources();
         RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
         mPipelineVariableShadingRate->CleanUp();
-        mRenderPassTest->CleanUp();
         mRenderPassShadingRate->CleanUp();
         CleanUpSyncObjects();
 
@@ -118,7 +115,7 @@ namespace render {
     }
 
     bool DrawAttachmentShadingRateThread::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
-        std::cout << "DrawAttachmentShadingRateThread::PhysicalDeviceSelectionCondition" << std::endl;
+        LOGI("DrawAttachmentShadingRateThread::PhysicalDeviceSelectionCondition");
         return true;
     }
 
@@ -147,10 +144,10 @@ namespace render {
         physicalDeviceFeatures2.pNext = &physicalDeviceFSRFeatures;
         vkGetPhysicalDeviceFeatures2(physicalDevice->Get(), &physicalDeviceFeatures2);
 
-        std::cout << "physicalDeviceFSRFeatures : "
-            << physicalDeviceFSRFeatures.attachmentFragmentShadingRate << " "
-            << physicalDeviceFSRFeatures.pipelineFragmentShadingRate << " "
-            << physicalDeviceFSRFeatures.primitiveFragmentShadingRate << std::endl;
+        LOGI("physicalDeviceVRSFeatures : %d %d %d",
+            physicalDeviceFSRFeatures.attachmentFragmentShadingRate,
+            physicalDeviceFSRFeatures.pipelineFragmentShadingRate,
+            physicalDeviceFSRFeatures.primitiveFragmentShadingRate);
 
         // properties
         VkPhysicalDeviceFragmentShadingRatePropertiesKHR physicalDeviceFSRProperties{
@@ -160,25 +157,26 @@ namespace render {
         physicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
         physicalDeviceProperties2.pNext = &physicalDeviceFSRProperties;
         vkGetPhysicalDeviceProperties2(physicalDevice->Get(), &physicalDeviceProperties2);
-        std::cout << "physicalDeviceFSRProperties : "
-            << "(" << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width << ", "
-            << physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height << ") "
-            << "(" << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width << ", "
-            << physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height << ") "
-            << "(" << physicalDeviceFSRProperties.maxFragmentSizeAspectRatio << ")\n";
+        LOGI("physicalDeviceVRSProperties : (%d, %d) (%d, %d) %d",
+            physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.width,
+            physicalDeviceFSRProperties.minFragmentShadingRateAttachmentTexelSize.height,
+            physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.width,
+            physicalDeviceFSRProperties.maxFragmentShadingRateAttachmentTexelSize.height,
+            physicalDeviceFSRProperties.maxFragmentSizeAspectRatio);
 
         // availiable shading rate
+        AppDispatchTable& dispatchTable = AppDispatchTable::GetInstance();
         uint32_t availiableShadingRateSize = 0;
         std::vector<VkPhysicalDeviceFragmentShadingRateKHR> availiableShadingRate(0);
-        VkResult res = GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, nullptr);
+        VkResult res = dispatchTable.GetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice->Get(), &availiableShadingRateSize, nullptr);
         if (availiableShadingRateSize != 0 && res == VK_SUCCESS) {
             availiableShadingRate.resize(availiableShadingRateSize, { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR });
-            GetPhysicalDeviceFragmentShadingRatesKHR(mInstance, physicalDevice->Get(), &availiableShadingRateSize, availiableShadingRate.data());
+            dispatchTable.GetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice->Get(), &availiableShadingRateSize, availiableShadingRate.data());
         }
 
         for (VkPhysicalDeviceFragmentShadingRateKHR& shadingRate : availiableShadingRate) {
-            std::cout << std::bitset<sizeof(VkSampleCountFlags) * 8>(shadingRate.sampleCounts)
-                << " (" << shadingRate.fragmentSize.width << "," << shadingRate.fragmentSize.height << ")" << std::endl;
+            LOGI("%x (%d, %d)", shadingRate.sampleCounts,
+                shadingRate.fragmentSize.width, shadingRate.fragmentSize.height);
         }
         // **********************************************************************
     }
@@ -231,8 +229,7 @@ namespace render {
             VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR,
             VK_FRAGMENT_SHADING_RATE_COMBINER_OP_MAX_KHR,
         };
-        VkCmdSetFragmentShadingRateKHR(RenderBase::mInstance,
-            commandBuffer, &shadingRates[0], combinerOps.data());
+        AppDispatchTable::GetInstance().CmdSetFragmentShadingRateKHR(commandBuffer,&shadingRates[0], combinerOps.data());
 
         // 绑定顶点缓冲
         std::vector<VkBuffer> vertexBuffers = { mVertexBuffer };
