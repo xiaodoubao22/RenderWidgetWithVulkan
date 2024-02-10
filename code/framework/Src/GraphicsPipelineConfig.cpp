@@ -85,4 +85,13 @@ bool GraphicsPipelineConfigBase::SetVertexInputAttributes(std::vector<VkVertexIn
 	mVertexInputState.pVertexAttributeDescriptions = mAttributes.size() == 0 ? nullptr : mAttributes.data();
 	return true;
 }
+
+bool GraphicsPipelineConfigBase::SetRasterizationSamples(VkSampleCountFlagBits sampleCount)
+{
+	if (!mIsValid) {
+		return false;
+	}
+	mMultisampleState.rasterizationSamples = sampleCount;
+	return true;
+}
 }

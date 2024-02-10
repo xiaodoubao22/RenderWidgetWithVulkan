@@ -30,6 +30,9 @@ private:
     void Resize();
 
     // ----- create and clean up ----- 
+    void CreateColorResources();
+    void CleanUpColorResources();
+
     void CreateDepthResources();
     void CleanUpDepthResources();
 
@@ -72,6 +75,11 @@ private:
     VkDeviceMemory mDepthImageMemory = VK_NULL_HANDLE;
     VkImageView mDepthImageView = VK_NULL_HANDLE;
 
+    // msaa color resources
+    VkImage mMsaaColorImage = VK_NULL_HANDLE;
+    VkDeviceMemory mMsaaColorImageMemory = VK_NULL_HANDLE;
+    VkImageView mMsaaColorImageView = VK_NULL_HANDLE;
+
     std::vector<VkFramebuffer> mSwapchainFramebuffers = {};
     VkCommandBuffer mCommandBuffer = VK_NULL_HANDLE;
 
@@ -100,15 +108,17 @@ private:
 
     // -------- data ------------
     std::vector<Vertex2DColorTexture> mQuadVertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},     // 左上
+        {{-0.3f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},     // 左上
         {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},      // 右上
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},       // 右下
+        {{0.3f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},       // 右下
         {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}       // 左下
     };
 
     const std::vector<uint16_t> mQuadIndices = {
         0, 1, 2, 2, 3, 0
     };
+
+    VkSampleCountFlagBits mMsaaSamples = VK_SAMPLE_COUNT_4_BIT;
 };
 }
 

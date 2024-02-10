@@ -330,5 +330,40 @@ inline VkSubpassDependency2 SubpassDependency2(uint32_t srcSubpass, uint32_t dst
     return info;
 }
 
+inline VkImageCreateInfo ImageCreateInfo(VkImageType imageType,
+    VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
+{
+    VkImageCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.pNext = nullptr;
+    info.flags = 0;
+    info.imageType = imageType;
+    info.format = format;
+    info.extent = extent;
+    info.usage = usage;
+    info.flags = 0;
+    info.mipLevels = 1;
+    info.arrayLayers = 1;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    return info;
+}
+
+inline VkImageViewCreateInfo ImageViewCreateInfo(VkImage image, VkImageViewType viewType,
+    VkFormat format, VkImageSubresourceRange subresourceRange)
+{
+    VkImageViewCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    info.pNext = nullptr;
+    info.flags = 0;
+    info.image = image;
+    info.viewType = viewType;
+    info.format = format;
+    info.subresourceRange = subresourceRange;
+    return info;
+}
+
 }       // namespace vulkanInitializers
 #endif  // __VULKAN_INITIALIZERS_H__

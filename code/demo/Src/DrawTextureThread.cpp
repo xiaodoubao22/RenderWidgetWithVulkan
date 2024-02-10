@@ -26,6 +26,7 @@ void DrawTextureThread::OnThreadInit() {
     CreateRenderPasses();
     CreatePipelines();
     mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    CreateColorResources();
     CreateDepthResources();
     CreateFramebuffers();
     CreateVertexBuffer();
@@ -96,6 +97,7 @@ void DrawTextureThread::OnThreadDestroy() {
     CleanUpVertexBuffer();
     CleanUpFramebuffers();
     CleanUpDepthResources();
+    CleanUpColorResources();
     RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
     CleanUpPipelines();
     CleanUpRenderPasses();
@@ -117,7 +119,7 @@ void DrawTextureThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32
 
     // 启动Pass
     std::array<VkClearValue, 2> clearValues = {
-        consts::CLEAR_COLOR_NAVY_FLT,
+        consts::CLEAR_COLOR_WHITE_FLT,
         consts::CLEAR_DEPTH_ONE_STENCIL_ZERO
     };
     VkRenderPassBeginInfo renderPassInfo{};
@@ -177,10 +179,35 @@ void DrawTextureThread::Resize() {
 
     CleanUpFramebuffers();
     CleanUpDepthResources();
+    CleanUpColorResources();
 
     mSwapchain->Recreate(mWindow.GetWindowExtent());
+    CreateColorResources();
     CreateDepthResources();
     CreateFramebuffers();
+}
+
+void DrawTextureThread::CreateColorResources()
+{
+    VkImageCreateInfo imageInfo = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, mSwapchain->GetFormat(),
+        { mSwapchain->GetExtent().width, mSwapchain->GetExtent().height, 1},
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    imageInfo.samples = mMsaaSamples;
+    RenderBase::mDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        mMsaaColorImage, mMsaaColorImageMemory);
+
+    VkImageViewCreateInfo viewInfo = vulkanInitializers::ImageViewCreateInfo(mMsaaColorImage,
+        VK_IMAGE_VIEW_TYPE_2D, mSwapchain->GetFormat(), { VK_IMAGE_ASPECT_COLOR_BIT , 0, 1, 0, 1});
+    if (vkCreateImageView(RenderBase::GetDevice(), &viewInfo, nullptr, &mMsaaColorImageView) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create texture image view!");
+    }
+}
+
+void DrawTextureThread::CleanUpColorResources()
+{
+    vkDestroyImageView(RenderBase::GetDevice(), mMsaaColorImageView, nullptr);
+    vkDestroyImage(RenderBase::GetDevice(), mMsaaColorImage, nullptr);
+    vkFreeMemory(RenderBase::GetDevice(), mMsaaColorImageMemory, nullptr);
 }
 
 void DrawTextureThread::CreateDepthResources() {
@@ -198,7 +225,7 @@ void DrawTextureThread::CreateDepthResources() {
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = mMsaaSamples;
     imageInfo.flags = 0;	// 可选标志，例如3D纹理中避免体素中的空气值
     RenderBase::mDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDepthImage, mDepthImageMemory);
 
@@ -235,9 +262,10 @@ void DrawTextureThread::CreateFramebuffers() {
     std::vector<VkImageView> swapChainImageViews = mSwapchain->GetImageViews();
     mSwapchainFramebuffers.resize(swapChainImageViews.size());
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
+        std::vector<VkImageView> attachments = {
+            mMsaaColorImageView,
+            mDepthImageView,
             swapChainImageViews[i],
-            mDepthImageView
         };
 
         VkFramebufferCreateInfo framebufferInfo{};
@@ -537,14 +565,17 @@ void DrawTextureThread::CreateDescriptorSets() {
 void DrawTextureThread::CreateRenderPasses()
 {
     // subpass
-    VkAttachmentReference2 colorAttachmentRef =
+    VkAttachmentReference2 msaaColorAttachmentRef =
         vulkanInitializers::AttachmentReference2(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkAttachmentReference2 depthAttachmentRef =
         vulkanInitializers::AttachmentReference2(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    VkAttachmentReference2 colorAttachmentResolveRef =
+        vulkanInitializers::AttachmentReference2(2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     std::vector<VkSubpassDescription2> subpasses = {
-        vulkanInitializers::SubpassDescription2(VK_PIPELINE_BIND_POINT_GRAPHICS, &colorAttachmentRef, &depthAttachmentRef),
+        vulkanInitializers::SubpassDescription2(VK_PIPELINE_BIND_POINT_GRAPHICS, &msaaColorAttachmentRef, &depthAttachmentRef),
     };
+    subpasses[0].pResolveAttachments = &colorAttachmentResolveRef;
 
     std::vector<VkSubpassDependency2> dependencys = { vulkanInitializers::SubpassDependency2(VK_SUBPASS_EXTERNAL, 0) };
     dependencys[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
@@ -557,19 +588,25 @@ void DrawTextureThread::CreateRenderPasses()
         { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
         VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-    std::vector<VkAttachmentDescription2> mAttachments2(2);
-    // 颜色附件
-    mAttachments2[0] = vulkanInitializers::AttachmentDescription2(mSwapchain->GetFormat());
+    std::vector<VkAttachmentDescription2> mAttachments2(3);
+    // Msaa颜色附件
+    mAttachments2[0] = vulkanInitializers::AttachmentDescription2(mSwapchain->GetFormat(), mMsaaSamples);
     vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[0],
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
     vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[0],
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     // 深度附件
-    mAttachments2[1] = vulkanInitializers::AttachmentDescription2(mMainDepthFormat);
+    mAttachments2[1] = vulkanInitializers::AttachmentDescription2(mMainDepthFormat, mMsaaSamples);
     vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[1],
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
     vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[1],
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    // 送显的颜色附件
+    mAttachments2[2] = vulkanInitializers::AttachmentDescription2(mSwapchain->GetFormat());
+    vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[2],
+        VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE);
+    vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[2],
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VkRenderPassCreateInfo2 renderPassInfo = vulkanInitializers::RenderPassCreateInfo2(mAttachments2, subpasses);
     vulkanInitializers::RenderPassCreateInfo2SetArray(renderPassInfo, dependencys);
@@ -618,6 +655,7 @@ void DrawTextureThread::CreatePipelines()
     configInfo.Fill();
     configInfo.SetVertexInputBindings({ Vertex2DColorTexture::GetBindingDescription() });
     configInfo.SetVertexInputAttributes(Vertex2DColorTexture::getAttributeDescriptions());
+    configInfo.SetRasterizationSamples(mMsaaSamples);
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = configInfo.Populate(mPipeline.layout, mMainRenderPass);
     pipelineCreateInfo.stageCount = spDrawTexture.shaderStageInfos.size();
     pipelineCreateInfo.pStages = spDrawTexture.shaderStageInfos.data();

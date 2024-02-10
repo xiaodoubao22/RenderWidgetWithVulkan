@@ -5,23 +5,23 @@
 #include "Thread.h"
 
 namespace window {
-    class WindowImpl : public WindowTemplate
-    {
-    public:
-        WindowImpl(bool resizable);
-        ~WindowImpl();
+class WindowImpl : public WindowTemplate
+{
+public:
+    WindowImpl(bool resizable);
+    ~WindowImpl();
 
-    private:
-        virtual void Initialize() override;
-        virtual void Update() override;
-        virtual void CleanUp() override;
-        virtual void OnFramebufferResized(int width, int height) override;
+private:
+    virtual void Initialize() override;
+    virtual void Update() override;
+    virtual void CleanUp() override;
+    virtual void OnFramebufferResized(int width, int height) override;
 
-    private:
-        render::Thread* mRenderThread = nullptr;
+private:
+    render::Thread* mRenderThread = nullptr;
 
-        bool mIsMinimized = false;
-    };
+    bool mIsMinimized = false;
+};
 }
 
 

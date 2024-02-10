@@ -9,52 +9,52 @@
 #include <vulkan/vulkan.h>
 
 namespace render {
-    extern struct SwapChainSupportdetails;
+extern struct SwapChainSupportdetails;
 
-    struct DeviceExtensionsHandle {
-        size_t extensionsCount = 0;
-        const char* const* extensionNamepPtr = nullptr;
-    };
+struct DeviceExtensionsHandle {
+    size_t extensionsCount = 0;
+    const char* const* extensionNamepPtr = nullptr;
+};
     
-    class PhysicalDevice {
-    public:
-        struct QueueFamilyIndices {
-            std::optional<uint32_t> graphicsFamily;
-            std::optional<uint32_t> presentFamily;
-            bool IsComplete() {
-                return graphicsFamily.has_value() && presentFamily.has_value();
-            }
-        };
-
-    public:
-        PhysicalDevice();
-        ~PhysicalDevice();
-
-        /*
-         * @brief Init.
-         * @param instance The instanse handle.
-         * @param supportedSurface The physical device we pick must support this surface.
-         */
-        void Init(VkInstance instance, VkSurfaceKHR supportedSurface);
-
-        /*
-         * @brief Clean up.
-         */
-        void CleanUp();
-
-        /*
-         * @brief Set additional suiatble test function, it need to call before Init().
-         */
-        void SetAdditionalSuiatbleTestFunction(const std::function<bool(VkPhysicalDevice)>& func) {
-            mAdditionalSuiatbleTest = func;
+class PhysicalDevice {
+public:
+    struct QueueFamilyIndices {
+        std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
+        bool IsComplete() {
+            return graphicsFamily.has_value() && presentFamily.has_value();
         }
+    };
 
-        /*
-         * @brief Set device extensions.
-         */
-        void SetDeviceExtensions(const std::vector<const char*>& deviceExtensions) {
-            mDeviceExtensions = deviceExtensions;
-        }
+public:
+    PhysicalDevice();
+    ~PhysicalDevice();
+
+    /*
+        * @brief Init.
+        * @param instance The instanse handle.
+        * @param supportedSurface The physical device we pick must support this surface.
+        */
+    void Init(VkInstance instance, VkSurfaceKHR supportedSurface);
+
+    /*
+        * @brief Clean up.
+        */
+    void CleanUp();
+
+    /*
+        * @brief Set additional suiatble test function, it need to call before Init().
+        */
+    void SetAdditionalSuiatbleTestFunction(const std::function<bool(VkPhysicalDevice)>& func) {
+        mAdditionalSuiatbleTest = func;
+    }
+
+    /*
+        * @brief Set device extensions.
+        */
+    void SetDeviceExtensions(const std::vector<const char*>& deviceExtensions) {
+        mDeviceExtensions = deviceExtensions;
+    }
 
         /*
          * @brief Get device extensions.
