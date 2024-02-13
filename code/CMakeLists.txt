@@ -8,29 +8,21 @@ set(THIRD_PARTY ${CMAKE_SOURCE_DIR}/../third_party)
 set(GLM_DIR ${THIRD_PARTY}/glm)
 set(GLFW_DIR ${THIRD_PARTY}/glfw-3.3.8.bin.WIN64)
 set(STB_DIR ${THIRD_PARTY}/stb)
+set(TINY_OBJ_LOADER_DIR ${THIRD_PARTY}/tinyobjloader)
 find_package(Vulkan REQUIRED)
 # 包含三方库
-include_directories(${GLM_DIR} ${GLFW_DIR}/include ${STB_DIR})
+include_directories(${GLM_DIR} ${GLFW_DIR}/include ${STB_DIR} ${TINY_OBJ_LOADER_DIR})
 
 # [RenderWidget]设置头文件路径
 set(RENDER_WIDGET_INC_DIRS
-    ${CMAKE_SOURCE_DIR}/framework/Inc
     ${CMAKE_SOURCE_DIR}/demo/Inc
+    ${CMAKE_SOURCE_DIR}/framework/Inc
     )
-file(GLOB RENDER_WIDGET_INC_FILES
-    ./framework/Inc/*.h ./framework/Inc/*.hpp
-    ./demo/Inc/*.h ./demo/Inc/*.hpp
-    )
+file(GLOB RENDER_WIDGET_INC_FILES ./*/Inc/*.h ./*/Inc/*.hpp)
 
 # [RenderWidget]设置源文件路径
-set(RENDER_WIDGET_SRC_DIRS
-    ${CMAKE_SOURCE_DIR}/framework/Src
-    ${CMAKE_SOURCE_DIR}/demo/Src
-    )
-file(GLOB RENDER_WIDGET_SRC_FILES
-    ./framework/Src/*.c ./framework/Src/*.cpp
-    ./demo/Src/*.c ./demo/Src/*.cpp
-    )
+set(RENDER_WIDGET_SRC_DIRS ${CMAKE_SOURCE_DIR}/*/Src)
+file(GLOB RENDER_WIDGET_SRC_FILES ./*/Src/*.c ./*/Src/*.cpp)
 
 # -----------render widget-----------
 set(RENDER_WIDGET RenderWidget)

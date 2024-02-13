@@ -22,8 +22,8 @@ protected:
     VkDevice GetDevice() { return mDevice->Get(); }
 
     // inherit interface
-    virtual bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice);
-    virtual std::vector<const char*> FillDeviceExtensions();
+    virtual std::vector<const char*> FillDeviceExtensions() = 0;
+    virtual std::vector<const char*> FillInstanceExtensions() = 0;
     virtual void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice);
 
 private:

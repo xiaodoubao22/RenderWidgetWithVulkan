@@ -3,7 +3,7 @@
 
 #include "Thread.h"
 #include "RenderBase.h"
-#include "Mesh.h"
+#include "TestMesh.h"
 #include "GraphicsPipelineConfig.h"
 
 #include <vector>

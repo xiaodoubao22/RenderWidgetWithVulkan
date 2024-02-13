@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <string>
 
 namespace render {
 struct Vertex2DColor {
@@ -68,8 +69,48 @@ struct Vertex2DColorTexture {
     }
 };
 
-class Mesh {
+struct Vertex3D {
+    glm::vec3 position;
+    glm::vec2 texCoord;
 
+    static VkVertexInputBindingDescription GetBindingDescription() {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex3D);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return bindingDescription;
+    }
+
+    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(Vertex3D, position);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex3D, texCoord);
+
+        return attributeDescriptions;
+    }
+
+    bool operator==(const Vertex3D& other) const {
+        return position == other.position && texCoord == other.texCoord;
+    }
+};
+
+class TestMesh {
+public:
+    TestMesh();
+    ~TestMesh();
+
+    bool LoadFromFile(std::string& path);
+
+private:
+    std::vector<Vertex3D> mVertices = {};
+    std::vector<uint16_t> mIndexes = {};
 };
 }
 

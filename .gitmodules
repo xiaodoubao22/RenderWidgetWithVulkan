@@ -7,6 +7,6 @@
     url = https://github.com/nothings/stb.git
     branch = master
 [submodule "third_party/tinyobjloader"]
-    path = third_party/tinyobjloade
+    path = third_party/tinyobjloader
     url = https://github.com/tinyobjloader/tinyobjloader.git
     branch = release

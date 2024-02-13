@@ -3,7 +3,7 @@
 
 #include "Thread.h"
 #include "RenderBase.h"
-#include "Mesh.h"
+#include "TestMesh.h"
 #include "GraphicsPipelineConfig.h"
 
 #include <vector>
@@ -24,9 +24,9 @@ private:
     virtual void OnThreadLoop() override;
     virtual void OnThreadDestroy() override;
 
-    bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) override;
-    std::vector<const char*> FillDeviceExtensions() override;
-    void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
+    virtual std::vector<const char*> FillDeviceExtensions() override;
+    virtual std::vector<const char*> FillInstanceExtensions() override;
+    virtual void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
 
 private:
     // ----- render functions -----

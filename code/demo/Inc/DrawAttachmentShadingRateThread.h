@@ -3,7 +3,7 @@
 
 #include "Thread.h"
 #include "RenderBase.h"
-#include "Mesh.h"
+#include "TestMesh.h"
 #include "GraphicsPipelineConfig.h"
 
 #include <vector>
@@ -24,8 +24,8 @@ private:
     virtual void OnThreadLoop() override;
     virtual void OnThreadDestroy() override;
 
-    bool PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) override;
     std::vector<const char*> FillDeviceExtensions() override;
+    virtual std::vector<const char*> FillInstanceExtensions() override;
     void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
 
 private:
@@ -121,7 +121,7 @@ private:
     const std::vector<uint16_t> mQuadIndices = {
         0, 1, 2, 2, 3, 0
     };
-    };
+};
 }
 
 

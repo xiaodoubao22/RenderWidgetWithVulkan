@@ -11,7 +11,6 @@
 namespace render {
 RenderBase::RenderBase(window::WindowTemplate& w) : mWindow(w)
 {
-    //mGraphicsDevice = new GraphicsDevice();
     mPhysicalDevice = new PhysicalDevice();
     mDevice = new Device();
     mSwapchain = new Swapchain();
@@ -39,9 +38,6 @@ void RenderBase::Init() {
     mSurface = mWindow.CreateSurface(mInstance);
         
     // physical device
-    std::function<bool(VkPhysicalDevice)> testFunc =
-        std::bind(&RenderBase::PhysicalDeviceSelectionCondition, this, std::placeholders::_1);
-    mPhysicalDevice->SetAdditionalSuiatbleTestFunction(testFunc);
     mPhysicalDevice->SetDeviceExtensions(FillDeviceExtensions());
     mPhysicalDevice->Init(mInstance, mSurface);
 
@@ -71,15 +67,6 @@ void RenderBase::CleanUp() {
     vkDestroyInstance(mInstance, nullptr);
 }
 
-bool RenderBase::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
-    LOGI("No additional conditions on choosing physical device");
-    return true;
-}
-
-std::vector<const char*> RenderBase::FillDeviceExtensions() {
-    return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-}
-
 void RenderBase::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {
     LOGI("Did not request any physical device features");
     return;
@@ -100,7 +87,8 @@ void RenderBase::CreateInstance() {
     if (mEnableValidationLayer){
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-    extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    auto otherExtensions = FillInstanceExtensions();
+    extensions.insert(extensions.end(), otherExtensions.begin(), otherExtensions.end());
     utils::PrintStringList(extensions, "enable extensions:");
     if (!CheckExtensionSupport(extensions)) {
         throw std::runtime_error("extension not all supported!");

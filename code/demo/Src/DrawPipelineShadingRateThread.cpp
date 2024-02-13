@@ -109,15 +109,18 @@ void DrawPipelineShadingRateThread::OnThreadDestroy() {
     RenderBase::CleanUp();
 }
 
-bool DrawPipelineShadingRateThread::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
-    LOGI("DrawPipelineShadingRateThread::PhysicalDeviceSelectionCondition");
-    return true;
-}
-
 std::vector<const char*> DrawPipelineShadingRateThread::FillDeviceExtensions() {
     std::vector<const char*> extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
+    };
+    return extensions;
+}
+
+std::vector<const char*> DrawPipelineShadingRateThread::FillInstanceExtensions()
+{
+    std::vector<const char*> extensions = {
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
     };
     return extensions;
 }

@@ -1,5 +1,5 @@
 #include "GraphicsPipelineConfig.h"
-#include "Mesh.h"
+#include "TestMesh.h"
 #include "VulkanInitializers.h"
 
 namespace render {

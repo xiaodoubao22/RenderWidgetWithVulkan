@@ -179,11 +179,6 @@ bool PhysicalDevice::IsDeviceSuatiable(VkPhysicalDevice device) {
 		return false;
 	}
 
-	// 其余判断条件
-	if (mAdditionalSuiatbleTest != nullptr && !mAdditionalSuiatbleTest(device)) {
-		return false;
-	}
-
 	std::cout << deviceProperties.deviceName << " suitable \n";
 	return true;
 }

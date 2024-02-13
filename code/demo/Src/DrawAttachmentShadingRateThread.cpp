@@ -108,15 +108,18 @@ void DrawAttachmentShadingRateThread::OnThreadDestroy() {
     RenderBase::CleanUp();
 }
 
-bool DrawAttachmentShadingRateThread::PhysicalDeviceSelectionCondition(VkPhysicalDevice physicalDevice) {
-    LOGI("DrawAttachmentShadingRateThread::PhysicalDeviceSelectionCondition");
-    return true;
-}
-
 std::vector<const char*> DrawAttachmentShadingRateThread::FillDeviceExtensions() {
     std::vector<const char*> extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
+    };
+    return extensions;
+}
+
+std::vector<const char*> DrawAttachmentShadingRateThread::FillInstanceExtensions()
+{
+    std::vector<const char*> extensions = {
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
     };
     return extensions;
 }

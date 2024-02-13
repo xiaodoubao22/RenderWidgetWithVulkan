@@ -254,8 +254,8 @@ void Device::CreateLogicalDevice() {
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());	// 两个命令队列
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();								// 两个命令队列
 	createInfo.pEnabledFeatures = &deviceFeatures;
-	createInfo.enabledExtensionCount = mPhysicalDevice->GetDeviceExtensionsHandle().extensionsCount;	// 设备支持的拓展：交换链等
-	createInfo.ppEnabledExtensionNames = mPhysicalDevice->GetDeviceExtensionsHandle().extensionNamepPtr;
+	createInfo.enabledExtensionCount = mPhysicalDevice->GetDeviceExtensions().size();	// 设备支持的拓展：交换链等
+	createInfo.ppEnabledExtensionNames = mPhysicalDevice->GetDeviceExtensions().data();
 	if (setting::enableValidationLayer) {
 		createInfo.enabledLayerCount = consts::validationLayers.size();
 		createInfo.ppEnabledLayerNames = consts::validationLayers.data();
