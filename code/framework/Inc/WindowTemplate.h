@@ -23,12 +23,34 @@ protected:
     virtual void Initialize() = 0;
     virtual void Update() = 0;
     virtual void CleanUp() = 0;
-    virtual void OnFramebufferResized(int width, int height) = 0;
+    virtual void OnFramebufferResized(int width, int height) {}
+    virtual void OnMouseButton(int button, int action, int mods) {}
+    virtual void OnCursorPosChanged(double xpos, double ypos) {}
+    virtual void OnKeyEvent(int key, int scancode, int action, int mods) {}
 
 private:
-    static void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
+    static void FramebufferSizeCallback(GLFWwindow* window, int width, int height)
+    {
         auto windowTemplate = reinterpret_cast<WindowTemplate*>(glfwGetWindowUserPointer(window));
         windowTemplate->OnFramebufferResized(width, height);
+    }
+
+    static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+    {
+        auto windowTemplate = reinterpret_cast<WindowTemplate*>(glfwGetWindowUserPointer(window));
+        windowTemplate->OnMouseButton(button, action, mods);
+    }
+
+    static void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+    {
+        auto windowTemplate = reinterpret_cast<WindowTemplate*>(glfwGetWindowUserPointer(window));
+        windowTemplate->OnCursorPosChanged(xpos, ypos);
+    }
+
+    static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+    {
+        auto windowTemplate = reinterpret_cast<WindowTemplate*>(glfwGetWindowUserPointer(window));
+        windowTemplate->OnKeyEvent(key, scancode, action, mods);
     }
 
 protected:

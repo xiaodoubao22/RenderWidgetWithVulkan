@@ -9,4 +9,7 @@ glslc %DemoShaderDir%\DrawTriangleTest.frag -o ..\spv_files\DrawTriangleTestFrag
 
 glslc %DemoShaderDir%\DrawTextureTest.vert -o ..\spv_files\DrawTextureTestVert.spv
 glslc %DemoShaderDir%\DrawTextureTest.frag -o ..\spv_files\DrawTextureTestFrag.spv
+
+glslc %DemoShaderDir%\DrawMesh.vert -o ..\spv_files\DrawMesh.vert.spv
+glslc %DemoShaderDir%\DrawMesh.frag -o ..\spv_files\DrawMesh.frag.spv
 pause

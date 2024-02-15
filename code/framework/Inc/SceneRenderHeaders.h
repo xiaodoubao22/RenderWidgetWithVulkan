@@ -4,5 +4,6 @@
 #include "SceneRenderBase.h"
 
 #include "DrawRotateQuad.h"
+#include "DrawSceneTest.h"
 
 #endif // !__SCENE_RENDER_HEADERS__

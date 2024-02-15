@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 #include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
 
 #include "Device.h"
 #include "GraphicsPipelineConfig.h"
@@ -20,6 +21,17 @@ struct RenderInputInfo {
     VkExtent2D swapchainExtent = {};
 };
 
+struct InputEventInfo {
+    bool leftPressFlag = false;
+    bool rightPressFlag = false;
+    bool middlePressFlag = false;
+    float cursorX = 0.0;
+    float cursorY = 0.0;
+    int key = GLFW_KEY_UNKNOWN;
+    int keyScancode = GLFW_KEY_UNKNOWN;
+    int keyAction = GLFW_KEY_UNKNOWN;
+};
+
 class SceneRenderBase {
 public:
     SceneRenderBase() {}
@@ -28,6 +40,7 @@ public:
     virtual void Init(const RenderInitInfo& initInfo) = 0;
     virtual void CleanUp() = 0;
     virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) = 0;
+    virtual void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) {}
 
     virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) = 0;
     virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) = 0;

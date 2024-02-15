@@ -19,6 +19,10 @@ public:
     explicit RenderThread(window::WindowTemplate& w);
     ~RenderThread();
 
+    void SetMouseButton(int button, int action, int mods);
+    void SetCursorPosChanged(double xpos, double ypos);
+    void SetKeyEvent(int key, int scancode, int action, int mods);
+
 private:
     virtual void OnThreadInit() override;
     virtual void OnThreadLoop() override;
@@ -60,6 +64,10 @@ private:
     VkRenderPass mPresentRenderPass = VK_NULL_HANDLE;
 
     SceneRenderBase* mSceneRender = nullptr;
+
+    // 交互数据
+    std::mutex mInputEnventMutex;
+    InputEventInfo mInputInfo = {};
 
 };
 }

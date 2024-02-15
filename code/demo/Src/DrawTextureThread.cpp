@@ -11,6 +11,7 @@
 #include <array>
 
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
 #include <stb_image.h>
 
 namespace render {
@@ -35,10 +36,6 @@ void DrawTextureThread::OnThreadInit() {
     CreateTextureSampler();
     CreateDescriptorPool();
     CreateDescriptorSets();
-
-    //TestMesh mesh;
-    //std::string path = "../resource/models/viking_room.obj";
-    //mesh.LoadFromFile(path);
 }
 
 void DrawTextureThread::OnThreadLoop() {

@@ -108,6 +108,16 @@ public:
 
     bool LoadFromFile(std::string& path);
 
+    std::vector<Vertex3D>& GetVertexData()
+    {
+        return mVertices;
+    }
+
+    std::vector<uint16_t>& GetIndexData()
+    {
+        return mIndexes;
+    }
+
 private:
     std::vector<Vertex3D> mVertices = {};
     std::vector<uint16_t> mIndexes = {};

@@ -15,24 +15,29 @@ WindowImpl::WindowImpl(bool resizable) : WindowTemplate(resizable)
     mRenderThread = new render::RenderThread(*this);
 }
 
-WindowImpl::~WindowImpl() {
+WindowImpl::~WindowImpl()
+{
     mRenderThread->Destroy();
     delete mRenderThread;
 }
 
-void WindowImpl::Initialize() {
+void WindowImpl::Initialize()
+{
     mRenderThread->Start();
 }
 
-void WindowImpl::Update() {
+void WindowImpl::Update()
+{
 
 }
 
-void WindowImpl::CleanUp() {
+void WindowImpl::CleanUp()
+{
     mRenderThread->Stop();
 }
 
-void WindowImpl::OnFramebufferResized(int width, int height) {
+void WindowImpl::OnFramebufferResized(int width, int height)
+{
     mRenderThread->SetFbResized();
 
     if (width == 0 || height == 0) {
@@ -49,5 +54,18 @@ void WindowImpl::OnFramebufferResized(int width, int height) {
     }
 }
 
-
+void WindowImpl::OnMouseButton(int button, int action, int mods)
+{
+    mRenderThread->SetMouseButton(button, action, mods);
 }
+
+void WindowImpl::OnCursorPosChanged(double xpos, double ypos)
+{
+    mRenderThread->SetCursorPosChanged(xpos, ypos);
+}
+
+void WindowImpl::OnKeyEvent(int key, int scancode, int action, int mods)
+{
+    mRenderThread->SetKeyEvent(key, scancode, action, mods);
+}
+}   // namespace window

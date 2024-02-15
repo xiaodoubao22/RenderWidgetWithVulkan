@@ -4,6 +4,7 @@
 #include "DebugUtils.h"
 #include "VulkanInitializers.h"
 #include "ShaderModuleFactory.h"
+#include "Log.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -12,7 +13,7 @@
 namespace render {
 RenderThread::RenderThread(window::WindowTemplate& w) : RenderBase(w)
 {
-    mSceneRender = new DrawRotateQuad;
+    mSceneRender = new DrawSceneTest;
 }
 
 RenderThread::~RenderThread()
@@ -45,6 +46,14 @@ void RenderThread::OnThreadLoop() {
     if (!mSwapchain->AcquireImage(mImageAvailableSemaphore, imageIndex)) {
         Resize();
     }
+
+    // 处理输入事件
+    InputEventInfo inputEnvent{};
+    {
+        std::unique_lock<std::mutex> lock();
+        inputEnvent = mInputInfo;
+    }
+    mSceneRender->ProcessInputEnvent(inputEnvent);
 
     // 记录命令
     RenderInputInfo renderInput{};
@@ -124,6 +133,56 @@ void RenderThread::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice)
     shadingRateCreateInfo.pipelineFragmentShadingRate = true;
     shadingRateCreateInfo.attachmentFragmentShadingRate = true;
     shadingRateCreateInfo.primitiveFragmentShadingRate = false;
+}
+
+void RenderThread::SetMouseButton(int button, int action, int mods)
+{
+    {
+        std::unique_lock<std::mutex> lock(mInputEnventMutex);
+        if (action == GLFW_PRESS) {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                mInputInfo.leftPressFlag = true;
+            }
+            else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                mInputInfo.rightPressFlag = true;
+            }
+            else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+                mInputInfo.middlePressFlag = true;
+            }
+        }
+        else if (action == GLFW_RELEASE) {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                mInputInfo.leftPressFlag = false;
+            }
+            else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                mInputInfo.rightPressFlag = false;
+            }
+            else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+                mInputInfo.middlePressFlag = false;
+            }
+        }
+    }
+    LOGD("button %d %d %d", button, action, mods);
+}
+
+void RenderThread::SetCursorPosChanged(double xpos, double ypos)
+{
+    {
+        std::unique_lock<std::mutex> lock(mInputEnventMutex);
+        mInputInfo.cursorX = xpos;
+        mInputInfo.cursorY = ypos;
+    }
+    LOGD("pos %f %f", xpos, ypos);
+}
+
+void RenderThread::SetKeyEvent(int key, int scancode, int action, int mods)
+{
+    {
+        std::unique_lock<std::mutex> lock(mInputEnventMutex);
+        mInputInfo.key = key;
+        mInputInfo.keyScancode = scancode;
+        mInputInfo.keyAction = action;
+    }
 }
 
 void RenderThread::Resize() {

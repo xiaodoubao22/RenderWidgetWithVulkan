@@ -52,7 +52,7 @@ bool TestMesh::LoadFromFile(std::string& path)
 
 			vertex.texCoord = {
 				attrib.texcoords[2 * index.texcoord_index + 0],
-				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+				attrib.texcoords[2 * index.texcoord_index + 1]
 			};
 
 			if (uniqueVertices.count(vertex) == 0) {

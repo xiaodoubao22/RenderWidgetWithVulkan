@@ -365,5 +365,46 @@ inline VkImageViewCreateInfo ImageViewCreateInfo(VkImage image, VkImageViewType 
     return info;
 }
 
+#define VULKAN_INITIALIZERS_FILL_WRITE_DESCRIPTOR_SET \
+info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;  \
+info.pNext = nullptr;                                 \
+info.dstSet = dstSet;                                 \
+info.dstBinding = binding;                            \
+info.dstArrayElement = dstArrayElement;               \
+info.descriptorCount = descriptorCount;               \
+info.descriptorType = descriptorType;
+
+inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet,
+    uint32_t binding, uint32_t dstArrayElement, uint32_t descriptorCount,
+    VkDescriptorType descriptorType, const VkDescriptorImageInfo* pImageInfo)
+{
+    VkWriteDescriptorSet info{};
+    VULKAN_INITIALIZERS_FILL_WRITE_DESCRIPTOR_SET
+    info.pImageInfo = pImageInfo;
+    return info;
+}
+
+inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet,
+    uint32_t binding, uint32_t dstArrayElement, uint32_t descriptorCount,
+    VkDescriptorType descriptorType, const VkDescriptorBufferInfo* pBufferInfo)
+{
+    VkWriteDescriptorSet info{};
+    VULKAN_INITIALIZERS_FILL_WRITE_DESCRIPTOR_SET
+    info.pBufferInfo = pBufferInfo;
+    return info;
+}
+
+inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet,
+    uint32_t binding, uint32_t dstArrayElement, uint32_t descriptorCount,
+    VkDescriptorType descriptorType, const VkBufferView* pTexelBufferView)
+{
+    VkWriteDescriptorSet info{};
+    VULKAN_INITIALIZERS_FILL_WRITE_DESCRIPTOR_SET
+    info.pTexelBufferView = pTexelBufferView;
+    return info;
+}
+
+#undef VULKAN_INITIALIZERS_FILL_WRITE_DESCRIPTOR_SET
+
 }       // namespace vulkanInitializers
 #endif  // __VULKAN_INITIALIZERS_H__
