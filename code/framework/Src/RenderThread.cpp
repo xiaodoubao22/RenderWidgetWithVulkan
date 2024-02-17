@@ -13,7 +13,9 @@
 namespace render {
 RenderThread::RenderThread(window::WindowTemplate& w) : RenderBase(w)
 {
-    mSceneRender = new DrawSceneTest;
+    //mSceneRender = new DrawSceneTest;
+    //mSceneRender = new DrawRotateQuad;
+    mSceneRender = new DrawScenePbr;
 }
 
 RenderThread::~RenderThread()
@@ -24,10 +26,14 @@ RenderThread::~RenderThread()
 void RenderThread::OnThreadInit() {
     RenderBase::Init();
 
+    mDepthFormat = RenderBase::FindSupportedFormat(
+        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+        VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
     // create render objects
     CreateSyncObjects();
-    CreateDepthResources();
     CreatePresentRenderPass();
+    CreateDepthResources();
     CreateFramebuffers();
 
     RenderInitInfo initInfo{};
@@ -39,13 +45,15 @@ void RenderThread::OnThreadInit() {
 void RenderThread::OnThreadLoop() {
     // 等待前一帧结束(等待队列中的命令执行完)，然后上锁，表示开始画了
     vkWaitForFences(RenderBase::mDevice->Get(), 1, &mInFlightFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(RenderBase::mDevice->Get(), 1, &mInFlightFence);
 
     // 获取图像
     uint32_t imageIndex;
     if (!mSwapchain->AcquireImage(mImageAvailableSemaphore, imageIndex)) {
         Resize();
+        return;
     }
+
+    vkResetFences(RenderBase::mDevice->Get(), 1, &mInFlightFence);
 
     // 处理输入事件
     InputEventInfo inputEnvent{};
@@ -70,7 +78,7 @@ void RenderThread::OnThreadLoop() {
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.waitSemaphoreCount = imageAvailiableSemaphore.size();
     submitInfo.pWaitSemaphores = imageAvailiableSemaphore.data();    // 指定要等待的信号量
-    submitInfo.pWaitDstStageMask = waitStages.data();      // 指定等待的阶段（颜色附件可写入）zaxG
+    submitInfo.pWaitDstStageMask = waitStages.data();      // 指定等待的阶段（颜色附件可写入）
     submitInfo.commandBufferCount = commandBuffers.size();
     submitInfo.pCommandBuffers = commandBuffers.data();
     submitInfo.signalSemaphoreCount = renderFinishedSemaphore.size();
@@ -111,8 +119,10 @@ std::vector<const char*> RenderThread::FillDeviceExtensions()
     // 默认只有swapchain扩展
     std::vector<const char*> deviceExt = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        //VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
+        VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
     };
-    
+
     // 场景需要的扩展
     mSceneRender->GetRequiredDeviceExtensions(deviceExt);
 
@@ -122,17 +132,17 @@ std::vector<const char*> RenderThread::FillDeviceExtensions()
 std::vector<const char*> RenderThread::FillInstanceExtensions()
 {
     std::vector<const char*> extensions = {
-        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 
     };
     return extensions;
 }
 
 void RenderThread::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {
-    auto& shadingRateCreateInfo = physicalDevice->RequestExtensionsFeatures<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR);
-    shadingRateCreateInfo.pipelineFragmentShadingRate = true;
-    shadingRateCreateInfo.attachmentFragmentShadingRate = true;
-    shadingRateCreateInfo.primitiveFragmentShadingRate = false;
+    //auto& shadingRateCreateInfo = physicalDevice->RequestExtensionsFeatures<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(
+    //    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR);
+    //shadingRateCreateInfo.pipelineFragmentShadingRate = true;
+    //shadingRateCreateInfo.attachmentFragmentShadingRate = true;
+    //shadingRateCreateInfo.primitiveFragmentShadingRate = false;
 }
 
 void RenderThread::SetMouseButton(int button, int action, int mods)
@@ -197,9 +207,6 @@ void RenderThread::Resize() {
 }
 
 void RenderThread::CreateDepthResources() {
-    mDepthFormat = FindSupportedFormat(
-        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-        VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     // image
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -276,14 +283,12 @@ void RenderThread::CleanUpFramebuffers() {
 void RenderThread::CreateSyncObjects() {
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;		//（初始化解锁）
-
-    if (vkCreateSemaphore(mDevice->Get(), &semaphoreInfo, nullptr, &mImageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(mDevice->Get(), &semaphoreInfo, nullptr, &mRenderFinishedSemaphore) != VK_SUCCESS ||
-        vkCreateFence(mDevice->Get(), &fenceInfo, nullptr, &mInFlightFence) != VK_SUCCESS) {
+    if (vkCreateSemaphore(RenderBase::GetDevice(), &semaphoreInfo, nullptr, &mImageAvailableSemaphore) != VK_SUCCESS ||
+        vkCreateSemaphore(RenderBase::GetDevice(), &semaphoreInfo, nullptr, &mRenderFinishedSemaphore) != VK_SUCCESS ||
+        vkCreateFence(RenderBase::GetDevice(), &fenceInfo, nullptr, &mInFlightFence) != VK_SUCCESS) {
         throw std::runtime_error("failed to create semaphores!");
     }
 }
@@ -328,7 +333,7 @@ void RenderThread::CreatePresentRenderPass()
 
     VkRenderPassCreateInfo2 renderPassInfo = vulkanInitializers::RenderPassCreateInfo2(mAttachments2, subpasses);
     vulkanInitializers::RenderPassCreateInfo2SetArray(renderPassInfo, dependencys);
-    if (vkCreateRenderPass2(mDevice->Get(), &renderPassInfo, nullptr, &mPresentRenderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass2(RenderBase::mDevice->Get(), &renderPassInfo, nullptr, &mPresentRenderPass) != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");
     }
 }

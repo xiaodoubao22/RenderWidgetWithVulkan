@@ -22,6 +22,7 @@ private:
 
 private:
     render::RenderThread* mRenderThread = nullptr;
+    //render::Thread* mRenderThread = nullptr;
 
     bool mIsMinimized = false;
 };

@@ -403,8 +403,47 @@ inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet,
     info.pTexelBufferView = pTexelBufferView;
     return info;
 }
-
 #undef VULKAN_INITIALIZERS_FILL_WRITE_DESCRIPTOR_SET
+
+inline VkMemoryAllocateInfo MemoryAllocateInfo(VkDeviceSize size = 0, uint32_t index = 0)
+{
+    VkMemoryAllocateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    info.pNext = nullptr;
+    info.allocationSize = size;
+    info.memoryTypeIndex = index;
+    return info;
+}
+
+inline VkFramebufferCreateInfo FramebufferCreateInfo(VkRenderPass pass, std::vector<VkImageView>& attachemnts,
+    uint32_t width, uint32_t height, uint32_t layers = 1)
+{
+    VkFramebufferCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    info.pNext = nullptr;
+    info.flags = 0;
+    info.renderPass = pass;
+    info.attachmentCount = attachemnts.size();
+    info.pAttachments = attachemnts.size() == 0 ? nullptr : attachemnts.data();
+    info.width = width;
+    info.height = height;
+    info.layers = layers;
+    return info;
+}
+
+inline VkRenderPassBeginInfo RenderPassBeginInfo(VkRenderPass pass, VkFramebuffer fb,
+    VkRect2D renderArea, std::vector<VkClearValue>& clearValues)
+{
+    VkRenderPassBeginInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    info.pNext = nullptr;
+    info.renderPass = pass;
+    info.framebuffer = fb;
+    info.renderArea = renderArea;
+    info.clearValueCount = clearValues.size();
+    info.pClearValues = clearValues.size() == 0 ? nullptr : clearValues.data();
+    return info;
+}
 
 }       // namespace vulkanInitializers
 #endif  // __VULKAN_INITIALIZERS_H__

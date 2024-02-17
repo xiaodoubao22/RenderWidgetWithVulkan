@@ -34,14 +34,27 @@ public:
         return mIsValid;
     }
 
-    virtual VkGraphicsPipelineCreateInfo Populate(VkPipelineLayout pipelineLayout = VK_NULL_HANDLE,
-        VkRenderPass renderPass = VK_NULL_HANDLE, uint32_t subPassIndex = 0);
+    virtual VkGraphicsPipelineCreateInfo Populate(VkPipelineLayout pipelineLayout,
+        VkRenderPass renderPass, uint32_t subPassIndex = 0);
+    virtual VkGraphicsPipelineCreateInfo Populate() const;
     virtual void Fill();
 
     bool AddDynamicState(VkDynamicState state);
     bool SetVertexInputBindings(std::vector<VkVertexInputBindingDescription>&& bindings);
     bool SetVertexInputAttributes(std::vector<VkVertexInputAttributeDescription>&& attributes);
     bool SetRasterizationSamples(VkSampleCountFlagBits sampleCount);
+    bool SetInputAssemblyState(VkPrimitiveTopology topology, VkBool32 primitiveRestart = VK_FALSE);
+
+    void SetRenderPass(VkRenderPass pass, uint32_t subpassIndex = 0)
+    {
+        mRenderPass = pass;
+        mSubpassIndex = subpassIndex;
+    }
+
+    void SetPipelineLayout(VkPipelineLayout pipelineLayout)
+    {
+        mPipelineLayout = pipelineLayout;
+    }
 
 public:
     bool mIsValid = false;
@@ -69,6 +82,11 @@ public:
 
     VkPipelineDynamicStateCreateInfo mDynamicState;
     std::vector<VkDynamicState> mDynamicStates = {};
+
+    VkRenderPass mRenderPass = VK_NULL_HANDLE;
+    uint32_t mSubpassIndex = 0;
+
+    VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
 };
 }
 

@@ -24,6 +24,26 @@ VkGraphicsPipelineCreateInfo GraphicsPipelineConfigBase::Populate(VkPipelineLayo
 	return pipelineInfo;
 }
 
+VkGraphicsPipelineCreateInfo GraphicsPipelineConfigBase::Populate() const
+{
+	VkGraphicsPipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.pVertexInputState = &mVertexInputState;
+	pipelineInfo.pInputAssemblyState = &mInputAssemblyState;
+	pipelineInfo.pViewportState = &mViewportState;
+	pipelineInfo.pRasterizationState = &mRasterizationState;
+	pipelineInfo.pMultisampleState = &mMultisampleState;
+	pipelineInfo.pDepthStencilState = &mDepthStencilState;
+	pipelineInfo.pColorBlendState = &mColorBlendState;
+	pipelineInfo.pDynamicState = &mDynamicState;
+	pipelineInfo.layout = mPipelineLayout;
+	pipelineInfo.renderPass = mRenderPass;
+	pipelineInfo.subpass = mSubpassIndex;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.basePipelineIndex = -1;
+	return pipelineInfo;
+}
+
 void GraphicsPipelineConfigBase::Fill()
 {
 	mBindings = {};
@@ -92,6 +112,16 @@ bool GraphicsPipelineConfigBase::SetRasterizationSamples(VkSampleCountFlagBits s
 		return false;
 	}
 	mMultisampleState.rasterizationSamples = sampleCount;
+	return true;
+}
+
+bool GraphicsPipelineConfigBase::SetInputAssemblyState(VkPrimitiveTopology topology, VkBool32 primitiveRestart)
+{
+	if (!mIsValid) {
+		return false;
+	}
+	mInputAssemblyState.topology = topology;
+	mInputAssemblyState.primitiveRestartEnable = primitiveRestart;
 	return true;
 }
 }

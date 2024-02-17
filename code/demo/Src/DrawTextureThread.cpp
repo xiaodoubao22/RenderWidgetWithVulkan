@@ -108,6 +108,22 @@ void DrawTextureThread::OnThreadDestroy() {
     RenderBase::CleanUp();
 }
 
+std::vector<const char*> DrawTextureThread::FillDeviceExtensions() {
+    std::vector<const char*> extensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
+    };
+    return extensions;
+}
+
+std::vector<const char*> DrawTextureThread::FillInstanceExtensions()
+{
+    std::vector<const char*> extensions = {
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+    };
+    return extensions;
+}
+
 void DrawTextureThread::RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex) {
     // 开始写入
     VkCommandBufferBeginInfo beginInfo{};

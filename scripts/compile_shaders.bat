@@ -12,4 +12,7 @@ glslc %DemoShaderDir%\DrawTextureTest.frag -o ..\spv_files\DrawTextureTestFrag.s
 
 glslc %DemoShaderDir%\DrawMesh.vert -o ..\spv_files\DrawMesh.vert.spv
 glslc %DemoShaderDir%\DrawMesh.frag -o ..\spv_files\DrawMesh.frag.spv
+
+glslc %DemoShaderDir%\ScreenQuad.vert -o ..\spv_files\ScreenQuad.vert.spv
+glslc %DemoShaderDir%\ScreenQuad.frag -o ..\spv_files\ScreenQuad.frag.spv
 pause

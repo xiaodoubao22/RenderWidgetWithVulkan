@@ -516,6 +516,3 @@ void DrawSceneTest::UpdataUniformBuffer(float aspectRatio)
     memcpy(mUniformBuffersMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
 }
 }   // namespace render
-
-
-

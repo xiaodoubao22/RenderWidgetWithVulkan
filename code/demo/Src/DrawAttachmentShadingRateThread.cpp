@@ -302,11 +302,6 @@ void DrawAttachmentShadingRateThread::CreateDepthResources() {
     if (vkCreateImageView(RenderBase::GetDevice(), &viewInfo, nullptr, &mDepthImageView) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture image view!");
     }
-
-    //// 转换格式
-    //TransitionImageLayout(mDepthImage, depthFormat,
-    //	VK_IMAGE_LAYOUT_UNDEFINED,
-    //	VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 }
 
 void DrawAttachmentShadingRateThread::CleanUpDepthResources() {

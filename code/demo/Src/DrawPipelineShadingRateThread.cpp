@@ -30,10 +30,11 @@ void DrawPipelineShadingRateThread::OnThreadInit() {
     // create render objects
     CreateSyncObjects();
     CreateRenderPasses();
-    CreatePipelines();
-    mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     CreateDepthResources();
     CreateFramebuffers();
+
+    mCommandBuffer = RenderBase::mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    CreatePipelines();
     CreateVertexBuffer();
     CreateIndexBuffer();
     CreateTexture();
@@ -100,10 +101,11 @@ void DrawPipelineShadingRateThread::OnThreadDestroy() {
     CleanUpTexture();
     CleanUpIndexBuffer();
     CleanUpVertexBuffer();
+    CleanUpPipelines();
+    RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
+
     CleanUpFramebuffers();
     CleanUpDepthResources();
-    RenderBase::mDevice->FreeCommandBuffer(mCommandBuffer);
-    CleanUpPipelines();
     CleanUpRenderPasses();
     CleanUpSyncObjects();
 

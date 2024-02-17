@@ -194,6 +194,14 @@ void Device::TransitionImageLayout(VkImage image, VkImageAspectFlags aspectMask,
 	const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels) {
 	VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 
+	AddCmdPipelineBarrier(commandBuffer, image, aspectMask, barrierInfo, mipLevels);
+
+	EndSingleTimeCommands(commandBuffer);
+}
+
+void Device::AddCmdPipelineBarrier(VkCommandBuffer cmdBuffer, VkImage image, VkImageAspectFlags aspectMask,
+	const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels)
+{
 	VkImageMemoryBarrier barrier{};	// 可用来转换Image格式，也可用来转换队列组所有权
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	barrier.srcAccessMask = barrierInfo.srcAccessMask;
@@ -209,15 +217,13 @@ void Device::TransitionImageLayout(VkImage image, VkImageAspectFlags aspectMask,
 	barrier.subresourceRange.baseArrayLayer = 0;	// 图像数组
 	barrier.subresourceRange.layerCount = 1;
 
-	vkCmdPipelineBarrier(commandBuffer,
+	vkCmdPipelineBarrier(cmdBuffer,
 		barrierInfo.srcStage, barrierInfo.dstStage,			// srcStageMask    dstStageMask
 		0,				// dependencyFlags
 		0, nullptr,		// memory barrier
 		0, nullptr,		// buffer memory barrier
 		1, &barrier		// image memory barrier
 	);
-
-	EndSingleTimeCommands(commandBuffer);
 }
 
 void Device::CreateLogicalDevice() {

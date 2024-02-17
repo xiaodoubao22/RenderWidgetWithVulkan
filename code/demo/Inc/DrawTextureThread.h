@@ -24,6 +24,10 @@ private:
     virtual void OnThreadLoop() override;
     virtual void OnThreadDestroy() override;
 
+    virtual std::vector<const char*> FillDeviceExtensions() override;
+
+    virtual std::vector<const char*> FillInstanceExtensions() override;
+
 private:
     // ----- render functions -----
     void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);

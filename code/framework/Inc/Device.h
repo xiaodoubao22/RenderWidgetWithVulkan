@@ -35,6 +35,8 @@ public:
 
     VkDevice Get() { return mDevice; }
 
+    PhysicalDevice* GetPhysicalDevice() { return mPhysicalDevice; }
+
     VkQueue GetGraphicsQueue() { return mGraphicsQueue; }
 
     VkQueue GetPresentQueue() { return mPresentQueue; }
@@ -58,7 +60,10 @@ public:
     void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
     void TransitionImageLayout(VkImage image, VkImageAspectFlags aspectMask,
-        const ImageMemoryBarrierInfo& barrierInfo,uint32_t mipLevels = 1);
+        const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels = 1);
+
+    void AddCmdPipelineBarrier(VkCommandBuffer cmdBuffer, VkImage image, VkImageAspectFlags aspectMask,
+        const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels = 1);
 
 private:
     void CreateLogicalDevice();

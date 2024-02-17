@@ -19,9 +19,9 @@ void DrawRotateQuad::Init(const RenderInitInfo& initInfo)
         return;
     }
     
+    mCommandBuffer = mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     CreateRenderPasses();
     CreatePipelines();
-    mCommandBuffer = mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     CreateVertexBuffer();
     CreateIndexBuffer();
     CreateUniformBuffer();
@@ -35,9 +35,9 @@ void DrawRotateQuad::CleanUp()
     CleanUpUniformBuffer();
     CleanUpIndexBuffer();
     CleanUpVertexBuffer();
-    mDevice->FreeCommandBuffer(mCommandBuffer);
     CleanUpPipelines();
     CleanUpRenderPasses();
+    mDevice->FreeCommandBuffer(mCommandBuffer);
 }
 
 std::vector<VkCommandBuffer>& DrawRotateQuad::RecordCommand(const RenderInputInfo& input)
@@ -102,7 +102,6 @@ std::vector<VkCommandBuffer>& DrawRotateQuad::RecordCommand(const RenderInputInf
 
     //画图
     vkCmdDrawIndexed(mCommandBuffer, mTriangleIndices.size(), 1, 0, 0, 0);
-    //vkCmdDraw(commandBuffer, gVertices.size(), 1, 0, 0);
 
     // 结束Pass
     vkCmdEndRenderPass(mCommandBuffer);
