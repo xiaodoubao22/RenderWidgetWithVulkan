@@ -1,5 +1,5 @@
-#ifndef __DRAW_SCENE_PBR_QUAD__
-#define __DRAW_SCENE_PBR_QUAD__
+#ifndef __DRAW_SCENE_PBR_H__
+#define __DRAW_SCENE_PBR_H__
 
 #include <vulkan/vulkan.h>
 
@@ -17,6 +17,7 @@ public:
     virtual void Init(const RenderInitInfo& initInfo) override;
     virtual void CleanUp() override;
     virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
+    virtual void OnResize(VkExtent2D newExtent) override;
 
     virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) override;
     virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) override;
@@ -27,8 +28,8 @@ private:
     void CreateRenderPasses();
     void CleanUpRenderPasses();
 
-    void CreateFramebuffers();
-    void CleanUpFramebuffers();
+    void CreateMainFramebuffer();
+    void CleanUpMainFramebuffer();
 
     void CreateVertexBuffer();
     void CleanUpVertexBuffer();
@@ -55,9 +56,13 @@ private:
     void UpdataUniformBuffer(float aspectRatio);
 
     // tool functions
-    PipelineComponents CreatePipeline(std::vector<SpvFilePath>& shaderFilePaths,
-        std::vector<VkDescriptorSetLayoutBinding>& layoutBindings, const GraphicsPipelineConfigBase& configInfo);
+    PipelineComponents CreatePipeline(const GraphicsPipelineConfigBase& configInfo,
+        std::vector<SpvFilePath>& shaderFilePaths,
+        std::vector<VkDescriptorSetLayoutBinding>& layoutBindings,
+        std::vector<VkPushConstantRange>& pushConstantRanges);
     void DestroyPipeline(PipelineComponents& pipeline);
+
+    void RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input);
 
 private:
     std::vector<VkCommandBuffer> mPrimaryCommandBuffers = {};
@@ -77,9 +82,11 @@ private:
     VkDeviceMemory mIndexBufferMemory = VK_NULL_HANDLE;
 
     // uniform buffer
-    VkBuffer mUniformBuffer = VK_NULL_HANDLE;
+    VkBuffer mUboMvp = VK_NULL_HANDLE;
+    void* mUboMvpMapped = nullptr;
+    VkBuffer mUboMaterial = VK_NULL_HANDLE;
+    void* mUboMaterialMapped = nullptr;
     VkDeviceMemory mUniformBuffersMemory = VK_NULL_HANDLE;
-    void* mUniformBuffersMapped = nullptr;
 
     VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetPbr = VK_NULL_HANDLE;
@@ -100,7 +107,8 @@ private:
     VkFramebuffer mMainFrameBuffer = VK_NULL_HANDLE;
     VkRenderPass mMainPass = VK_NULL_HANDLE;
 
-    VkExtent2D mMainFbExtent = { 640 , 480 };
+    const float mResolutionFactor = 0.8;
+    VkExtent2D mMainFbExtent = {};
     const VkFormat mMainFbColorFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
     const VkFormat mMainFbDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 
@@ -109,6 +117,14 @@ private:
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
+        glm::vec3 cameraPos;
+    };
+
+    struct UniformMaterial {
+        float roughness;
+        float metallic;
+        alignas(16)glm::vec3 albedo;
+        alignas(16)glm::vec3 modelOffset;
     };
 
     TestMesh* mMesh = nullptr;
@@ -128,4 +144,4 @@ private:
 };
 }
 
-#endif // __DRAW_SCENE_PBR_QUAD__
+#endif // __DRAW_SCENE_PBR_H__

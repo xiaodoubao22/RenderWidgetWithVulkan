@@ -23,6 +23,8 @@ public:
     void SetCursorPosChanged(double xpos, double ypos);
     void SetKeyEvent(int key, int scancode, int action, int mods);
 
+    void SetFbResized();
+
 private:
     virtual void OnThreadInit() override;
     virtual void OnThreadLoop() override;
@@ -68,6 +70,8 @@ private:
     // 交互数据
     std::mutex mInputEnventMutex;
     InputEventInfo mInputInfo = {};
+
+    std::atomic<bool> mFramebufferResized = false;
 
 };
 }

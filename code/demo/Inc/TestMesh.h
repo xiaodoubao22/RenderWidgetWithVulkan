@@ -72,6 +72,7 @@ struct Vertex2DColorTexture {
 struct Vertex3D {
     glm::vec3 position;
     glm::vec2 texCoord;
+    glm::vec3 normal;
 
     static VkVertexInputBindingDescription GetBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
@@ -82,7 +83,7 @@ struct Vertex3D {
     }
 
     static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
         attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -90,8 +91,13 @@ struct Vertex3D {
 
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
         attributeDescriptions[1].offset = offsetof(Vertex3D, texCoord);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(Vertex3D, normal);
 
         return attributeDescriptions;
     }
@@ -106,7 +112,9 @@ public:
     TestMesh();
     ~TestMesh();
 
-    bool LoadFromFile(std::string& path);
+    void LoadFromFile(std::string& path);
+
+    void GenerateSphere(float radius = 1.0f, glm::vec3 center = { 0, 0, 0 }, glm::uvec2 gridNum = { 20, 20 });
 
     std::vector<Vertex3D>& GetVertexData()
     {

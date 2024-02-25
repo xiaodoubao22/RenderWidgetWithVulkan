@@ -17,9 +17,6 @@ public:
     void Destroy();
 
     virtual void PushData(std::string& lable, void* data);
-    void SetFbResized();
-    void ResetFbResized();
-    bool IsFbResized();
 
 private:
     void ThreadFunction();
@@ -35,9 +32,6 @@ private:
     std::mutex mThreadActiveMutex;
     bool mThreadActiveFlag = false;
     bool mIsDestroying = false;
-
-    // common data
-    std::atomic<bool> mFramebufferResized = false;
 };
 }
 

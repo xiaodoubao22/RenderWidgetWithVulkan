@@ -37,11 +37,14 @@ const std::string dirTexture = "../resource/textures/";
 }
 
 namespace consts {
+constexpr float FLT_PI = 3.14159265358979323f;
+
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation",
 };
 
 const VkClearValue CLEAR_COLOR_WHITE_FLT = { 1.0f, 1.0f, 1.0f, 1.0f };
+const VkClearValue CLEAR_COLOR_GRAY_FLT = { 0.5f, 0.5f, 0.5f, 1.0f };
 const VkClearValue CLEAR_COLOR_NAVY_FLT = { 0.2f, 0.3f, 0.3f, 1.0f };
 const VkClearValue CLEAR_DEPTH_ONE_STENCIL_ZERO = { 1.0f, 0 };
 

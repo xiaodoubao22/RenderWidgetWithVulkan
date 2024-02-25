@@ -445,5 +445,18 @@ inline VkRenderPassBeginInfo RenderPassBeginInfo(VkRenderPass pass, VkFramebuffe
     return info;
 }
 
+inline VkBufferCreateInfo BufferCreateInfo(VkDeviceSize size,
+    VkBufferUsageFlags usage, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE)
+{
+    VkBufferCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    info.pNext = nullptr;
+    info.flags = 0;
+    info.size = size;
+    info.usage = usage;
+    info.sharingMode = sharingMode;
+    return info;
+}
+
 }       // namespace vulkanInitializers
 #endif  // __VULKAN_INITIALIZERS_H__

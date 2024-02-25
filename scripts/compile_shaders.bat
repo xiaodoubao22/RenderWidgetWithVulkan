@@ -12,6 +12,8 @@ glslc %DemoShaderDir%\DrawTextureTest.frag -o ..\spv_files\DrawTextureTestFrag.s
 
 glslc %DemoShaderDir%\DrawMesh.vert -o ..\spv_files\DrawMesh.vert.spv
 glslc %DemoShaderDir%\DrawMesh.frag -o ..\spv_files\DrawMesh.frag.spv
+glslc %DemoShaderDir%\DrawMeshDefuse.frag -o ..\spv_files\DrawMeshDefuse.frag.spv
+glslc %DemoShaderDir%\DrawMeshGlossy.frag -o ..\spv_files\DrawMeshGlossy.frag.spv
 
 glslc %DemoShaderDir%\ScreenQuad.vert -o ..\spv_files\ScreenQuad.vert.spv
 glslc %DemoShaderDir%\ScreenQuad.frag -o ..\spv_files\ScreenQuad.frag.spv

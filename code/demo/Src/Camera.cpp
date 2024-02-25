@@ -2,11 +2,11 @@
 
 namespace render {
 Camera::Camera() {
-    mYaw = 90.0f;
-    mPitch = 15.0f;
+    mYaw = 0.0f;
+    mPitch = 0.0f;
 
     mWorldUp = glm::vec3(0.0, 0.0, 1.0);
-    mTargetPoint = glm::vec3(0.3, 0.35, 0.15);
+    mTargetPoint = glm::vec3(0.0, 0.0, 0.0);
     mTargetDistance = 1.0f;
     UpdateView();
 

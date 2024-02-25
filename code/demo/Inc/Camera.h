@@ -39,7 +39,7 @@ public:
 
     void UpdateView();
 
-private:
+public:
     float_t mYaw;
     float_t mPitch;
     float_t mSensitiveYaw = 0.1;

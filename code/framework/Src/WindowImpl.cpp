@@ -38,8 +38,6 @@ void WindowImpl::CleanUp()
 
 void WindowImpl::OnFramebufferResized(int width, int height)
 {
-    mRenderThread->SetFbResized();
-
     if (width == 0 || height == 0) {
         if (mIsMinimized == false) {
             mRenderThread->Stop();    // 最小化时停止渲染线程
@@ -52,6 +50,8 @@ void WindowImpl::OnFramebufferResized(int width, int height)
         }
         mIsMinimized = false;
     }
+
+    mRenderThread->SetFbResized();
 }
 
 void WindowImpl::OnMouseButton(int button, int action, int mods)

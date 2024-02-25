@@ -80,6 +80,7 @@ std::vector<VkCommandBuffer>& DrawSceneTest::RecordCommand(const RenderInputInfo
     // 启动Pass
     std::array<VkClearValue, 2> clearValues = {
         consts::CLEAR_COLOR_NAVY_FLT,
+        //consts::CLEAR_COLOR_WHITE_FLT,
         consts::CLEAR_DEPTH_ONE_STENCIL_ZERO
     };
     VkRenderPassBeginInfo renderPassInfo{};

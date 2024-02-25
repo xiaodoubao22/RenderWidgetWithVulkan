@@ -28,6 +28,8 @@ private:
 
     virtual std::vector<const char*> FillInstanceExtensions() override;
 
+    void SetFbResized();
+
 private:
     // ----- render functions -----
     void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
@@ -123,6 +125,8 @@ private:
     };
 
     VkSampleCountFlagBits mMsaaSamples = VK_SAMPLE_COUNT_4_BIT;
+
+    std::atomic<bool> mFramebufferResized = false;
 };
 }
 

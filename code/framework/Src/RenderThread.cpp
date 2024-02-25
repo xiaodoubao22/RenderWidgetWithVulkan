@@ -39,6 +39,7 @@ void RenderThread::OnThreadInit() {
     RenderInitInfo initInfo{};
     initInfo.presentRenderPass = mPresentRenderPass;
     initInfo.device = mDevice;
+    initInfo.swapchainExtent = mSwapchain->GetExtent();
     mSceneRender->Init(initInfo);
 }
 
@@ -94,8 +95,8 @@ void RenderThread::OnThreadLoop() {
     }
 
     // 主动重建交换链
-    if (Thread::IsFbResized()) {
-        Thread::ResetFbResized();
+    if (mFramebufferResized.load()) {
+        mFramebufferResized.store(false);
         Resize();
     }
 }
@@ -195,13 +196,24 @@ void RenderThread::SetKeyEvent(int key, int scancode, int action, int mods)
     }
 }
 
-void RenderThread::Resize() {
-    vkDeviceWaitIdle(mDevice->Get());
+void RenderThread::SetFbResized()
+{
+    mFramebufferResized.store(true);
+}
 
+void RenderThread::Resize() {
+    VkExtent2D newExtent = mWindow.GetWindowExtent();
+    if (newExtent.width == 0 || newExtent.height == 0) {
+        return;
+    }
+
+    vkDeviceWaitIdle(mDevice->Get());
     CleanUpFramebuffers();
     CleanUpDepthResources();
 
-    mSwapchain->Recreate(mWindow.GetWindowExtent());
+
+    mSceneRender->OnResize(newExtent);
+    mSwapchain->Recreate(newExtent);
     CreateDepthResources();
     CreateFramebuffers();
 }

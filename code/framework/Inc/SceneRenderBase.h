@@ -13,6 +13,7 @@ namespace render {
 struct RenderInitInfo {
     VkRenderPass presentRenderPass = VK_NULL_HANDLE;
     Device* device = nullptr;
+    VkExtent2D swapchainExtent = {};
 };
 
 struct RenderInputInfo {
@@ -41,9 +42,10 @@ public:
     virtual void CleanUp() = 0;
     virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) = 0;
     virtual void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) {}
+    virtual void OnResize(VkExtent2D newExtent) {}
 
-    virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) = 0;
-    virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) = 0;
+    virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) {};
+    virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) {};
 
 protected:
     bool InitCheck(const RenderInitInfo& initInfo)

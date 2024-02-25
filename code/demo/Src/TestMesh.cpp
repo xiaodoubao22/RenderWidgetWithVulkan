@@ -13,6 +13,7 @@
 #include "glm/gtx/hash.hpp"
 
 #include "Log.h"
+#include "Utils.h"
 
 namespace std {
 template<> struct hash<render::Vertex3D> {
@@ -26,8 +27,11 @@ namespace render {
 TestMesh::TestMesh() {}
 TestMesh::~TestMesh() {}
 
-bool TestMesh::LoadFromFile(std::string& path)
+void TestMesh::LoadFromFile(std::string& path)
 {
+	mVertices.clear();
+	mIndexes.clear();
+
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
@@ -64,6 +68,55 @@ bool TestMesh::LoadFromFile(std::string& path)
 	}
 
 	LOGI("mVertices.size() = %d", mVertices.size());
+}
+
+void TestMesh::GenerateSphere(float radius, glm::vec3 center, glm::uvec2 gridNum)
+{
+	mVertices.clear();
+	mIndexes.clear();
+
+	int gridNumU = gridNum.x;
+	int gridNumV = gridNum.y;
+
+	for (int j = 0; j <= gridNumV; j++) {
+		for (int i = 0; i <= gridNumU; i++) {
+			float u = static_cast<float>(i) / gridNumU;
+			float v = static_cast<float>(j) / gridNumV;
+
+			Vertex3D vertex{};
+			vertex.texCoord = { u, 1.0f - v };
+			vertex.texCoord *= 2.0;
+
+			float phy = v * consts::FLT_PI;
+			float theta = u * consts::FLT_PI * 2;
+			vertex.position.x = radius * std::sin(phy) * std::cos(theta);
+			vertex.position.y = radius * std::sin(phy) * std::sin(theta);
+			vertex.position.z = radius * std::cos(phy);
+
+			vertex.normal = glm::normalize(vertex.position - center);
+
+			mVertices.emplace_back(vertex);
+		}
+	}
+
+	for (int j = 0; j < gridNumV; j++) {
+		for (int i = 0; i < gridNumU; i++) {
+			int x = j * (gridNumU + 1) + i;
+			int leftUp = x;
+			int leftDown = x + gridNumU + 1;
+			int rightUp = leftUp + 1;
+			int rightDown = leftDown + 1;
+
+			mIndexes.push_back(rightUp);
+			mIndexes.push_back(leftUp);
+			mIndexes.push_back(rightDown);
+
+			mIndexes.push_back(leftDown);
+			mIndexes.push_back(rightDown);
+			mIndexes.push_back(leftUp);
+		}
+	}
+
 }
 }   // namespace render
 

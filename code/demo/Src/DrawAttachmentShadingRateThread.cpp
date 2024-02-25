@@ -83,8 +83,8 @@ void DrawAttachmentShadingRateThread::OnThreadLoop() {
     }
 
     // 主动重建交换链
-    if (Thread::IsFbResized()) {
-        Thread::ResetFbResized();
+    if (mFramebufferResized.load()) {
+        mFramebufferResized.store(false);
         Resize();
     }
 }

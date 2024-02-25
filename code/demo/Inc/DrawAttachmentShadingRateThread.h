@@ -28,6 +28,8 @@ private:
     virtual std::vector<const char*> FillInstanceExtensions() override;
     void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
 
+    void SetFbResized();
+
 private:
     // ----- render functions -----
     void RecordCommandBuffer(VkCommandBuffer commandBuffer, int32_t imageIndex);
@@ -121,6 +123,8 @@ private:
     const std::vector<uint16_t> mQuadIndices = {
         0, 1, 2, 2, 3, 0
     };
+
+    std::atomic<bool> mFramebufferResized = false;
 };
 }
 

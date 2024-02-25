@@ -33,11 +33,16 @@ void DrawScenePbr::Init(const RenderInitInfo& initInfo)
         return;
     }
 
-    std::string path = "../resource/models/viking_room.obj";
-    mMesh->LoadFromFile(path);
+    mMainFbExtent = initInfo.swapchainExtent;
+    mMainFbExtent.width *= mResolutionFactor;
+    mMainFbExtent.height *= mResolutionFactor;
+
+    mCamera->mTargetDistance = 20.0f;
+    mCamera->mTargetPoint = glm::vec3(0.0, 5.0, 5.0);
+    mMesh->GenerateSphere(1.0f, glm::vec3(0.0), glm::uvec2(64, 64));
 
     CreateRenderPasses();
-    CreateFramebuffers();
+    CreateMainFramebuffer();
     CreatePipelines();
     mCommandBuffer = mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     CreateVertexBuffer();
@@ -59,7 +64,7 @@ void DrawScenePbr::CleanUp()
     CleanUpVertexBuffer();
     mDevice->FreeCommandBuffer(mCommandBuffer);
     CleanUpPipelines();
-    CleanUpFramebuffers();
+    CleanUpMainFramebuffer();
     CleanUpRenderPasses();
 }
 
@@ -79,8 +84,8 @@ std::vector<VkCommandBuffer>& DrawScenePbr::RecordCommand(const RenderInputInfo&
         throw std::runtime_error("fiaile to begin recording command buffer!");
     }
 
-    std::vector<VkClearValue> clearValuesMain = { consts::CLEAR_COLOR_WHITE_FLT, consts::CLEAR_DEPTH_ONE_STENCIL_ZERO };
-    VkRect2D renderArea = { {0, 0}, mMainFbExtent };
+    std::vector<VkClearValue> clearValuesMain = { { 0.1f, 0.1f, 0.1f, 1.0f }, consts::CLEAR_DEPTH_ONE_STENCIL_ZERO };
+    VkRect2D renderArea = { {0, 0}, {mMainFbExtent.width, mMainFbExtent.height} };
     VkRenderPassBeginInfo renderPassInfoMain = vulkanInitializers::RenderPassBeginInfo(
         mMainPass, mMainFrameBuffer, renderArea, clearValuesMain);
     vkCmdBeginRenderPass(mCommandBuffer, &renderPassInfoMain, VK_SUBPASS_CONTENTS_INLINE);
@@ -104,7 +109,22 @@ std::vector<VkCommandBuffer>& DrawScenePbr::RecordCommand(const RenderInputInfo&
         mPipelineDrawPbr.layout,
         0, 1, &mDescriptorSetPbr,
         0, nullptr);
-    vkCmdDrawIndexed(mCommandBuffer, mMesh->GetIndexData().size(), 1, 0, 0, 0);
+
+    UniformMaterial uboMaterial{};
+    uboMaterial.albedo = glm::vec3(1.0, 0.5, 0.0);
+
+    int ySegMent = 5;
+    int zSegMent = 5;
+    float SphereDistance = 2.5f;
+    for (int y = 0; y < ySegMent; y++) {
+        for (int z = 0; z < zSegMent; z++) {
+            uboMaterial.roughness = 0.2f + static_cast<float>(z) / zSegMent;
+            uboMaterial.metallic = 0.2f + static_cast<float>(y) / ySegMent;
+            uboMaterial.modelOffset = glm::vec3(0.0, SphereDistance * y, SphereDistance * z);
+            vkCmdPushConstants(mCommandBuffer, mPipelineDrawPbr.layout, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformMaterial), &uboMaterial);
+            vkCmdDrawIndexed(mCommandBuffer, mMesh->GetIndexData().size(), 1, 0, 0, 0);
+        }
+    }
 
     vkCmdEndRenderPass(mCommandBuffer);
 
@@ -120,39 +140,8 @@ std::vector<VkCommandBuffer>& DrawScenePbr::RecordCommand(const RenderInputInfo&
     mDevice->AddCmdPipelineBarrier(mCommandBuffer, mMainFbColorImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
     // =============================================================================
-    // 启动Pass
-    std::array<VkClearValue, 2> clearValues = {
-        consts::CLEAR_COLOR_NAVY_FLT,
-        consts::CLEAR_DEPTH_ONE_STENCIL_ZERO
-    };
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = input.presentRenderPass;
-    renderPassInfo.framebuffer = input.swapchanFb;
-    renderPassInfo.renderArea.offset = { 0, 0 };
-    renderPassInfo.renderArea.extent = input.swapchainExtent;
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
-    vkCmdBeginRenderPass(mCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    // 绑定Pipeline
-    vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelinePresent.pipeline);
-    VkViewport viewport = { 0.0f, 0.0f, input.swapchainExtent.width, input.swapchainExtent.height, 0.0f, 1.0f };
-    vkCmdSetViewport(mCommandBuffer, 0, 1, &viewport);
-    VkRect2D scissor = { { 0, 0 }, input.swapchainExtent };
-    vkCmdSetScissor(mCommandBuffer, 0, 1, &scissor);
-
-    // 绑定DescriptorSet
-    vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        mPipelinePresent.layout,
-        0, 1, &mDescriptorSetPresent,
-        0, nullptr);
-
-    //画图
-    vkCmdDraw(mCommandBuffer, 4, 1, 0, 0);
-
-    // 结束Pass
-    vkCmdEndRenderPass(mCommandBuffer);
+    RecordPresentPass(mCommandBuffer, input);
 
     // 写入完成
     if (vkEndCommandBuffer(mCommandBuffer) != VK_SUCCESS) {
@@ -162,6 +151,24 @@ std::vector<VkCommandBuffer>& DrawScenePbr::RecordCommand(const RenderInputInfo&
     mPrimaryCommandBuffers.clear();
     mPrimaryCommandBuffers.emplace_back(mCommandBuffer);
     return mPrimaryCommandBuffers;
+}
+
+void DrawScenePbr::OnResize(VkExtent2D newExtent)
+{
+    if (newExtent.width == 0 || newExtent.height == 0) {
+        return;
+    }
+    mMainFbExtent = newExtent;
+    mMainFbExtent.width *= mResolutionFactor;
+    mMainFbExtent.height *= mResolutionFactor;
+
+    vkFreeDescriptorSets(mDevice->Get(), mDescriptorPool, 1, &mDescriptorSetPbr);
+    vkFreeDescriptorSets(mDevice->Get(), mDescriptorPool, 1, &mDescriptorSetPresent);
+
+    CleanUpMainFramebuffer();
+    CreateMainFramebuffer();
+
+    CreateDescriptorSets();
 }
 
 void DrawScenePbr::GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt)
@@ -251,7 +258,7 @@ void DrawScenePbr::CleanUpRenderPasses()
     vkDestroyRenderPass(mDevice->Get(), mMainPass, nullptr);
 }
 
-void DrawScenePbr::CreateFramebuffers()
+void DrawScenePbr::CreateMainFramebuffer()
 {
     // create images
     VkImageCreateInfo colorImageInfo = vulkanInitializers::ImageCreateInfo(
@@ -315,8 +322,9 @@ void DrawScenePbr::CreateFramebuffers()
     LOGI("create main fb success %d", mMainFrameBuffer);
 }
 
-void DrawScenePbr::CleanUpFramebuffers()
+void DrawScenePbr::CleanUpMainFramebuffer()
 {
+    LOGI("clean up main fb %d", mMainFrameBuffer);
     vkDestroyFramebuffer(mDevice->Get(), mMainFrameBuffer, nullptr);
     vkDestroyImageView(mDevice->Get(), mMainFbDepthImageView, nullptr);
     vkDestroyImageView(mDevice->Get(), mMainFbColorImageView, nullptr);
@@ -399,18 +407,48 @@ void DrawScenePbr::CleanUpIndexBuffer() {
 }
 
 void DrawScenePbr::CreateUniformBuffer() {
-    VkDeviceSize bufferSize = sizeof(UboMvpMatrix);
+    VkBufferCreateInfo bufferInfo = vulkanInitializers::BufferCreateInfo(sizeof(UboMvpMatrix),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    if (vkCreateBuffer(mDevice->Get(), &bufferInfo, nullptr, &mUboMvp) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create uMvp buffer");
+    }
 
-    mDevice->CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        mUniformBuffer, mUniformBuffersMemory);
+    bufferInfo.size = sizeof(UniformMaterial);
+    if (vkCreateBuffer(mDevice->Get(), &bufferInfo, nullptr, &mUboMaterial) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create uMaterial buffer");
+    }
 
-    vkMapMemory(mDevice->Get(), mUniformBuffersMemory, 0, bufferSize, 0, &mUniformBuffersMapped);
+    VkMemoryRequirements memReqMvp{};
+    vkGetBufferMemoryRequirements(mDevice->Get(), mUboMvp, &memReqMvp);
+
+    VkMemoryRequirements memReqMaterial{};
+    vkGetBufferMemoryRequirements(mDevice->Get(), mUboMaterial, &memReqMaterial);
+
+    VkDeviceSize uMvpMemSize =
+        static_cast<VkDeviceSize>(std::ceil(static_cast<double>(memReqMvp.size) / memReqMaterial.alignment)) * memReqMaterial.alignment;
+    VkDeviceSize uMaterialMemSize = memReqMaterial.size;
+
+    // 申请显存
+    VkMemoryAllocateInfo allocInfo = vulkanInitializers::MemoryAllocateInfo();
+    allocInfo.allocationSize = uMvpMemSize + uMaterialMemSize;
+    allocInfo.memoryTypeIndex = mDevice->GetPhysicalDevice()->FindMemoryType(
+        memReqMvp.memoryTypeBits & memReqMaterial.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (vkAllocateMemory(mDevice->Get(), &allocInfo, nullptr, &mUniformBuffersMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate vertex buffer memory!");
+    }
+
+    // 显存绑定到缓冲区
+    vkBindBufferMemory(mDevice->Get(), mUboMvp, mUniformBuffersMemory, 0);
+    vkBindBufferMemory(mDevice->Get(), mUboMaterial, mUniformBuffersMemory, uMvpMemSize);
+
+    vkMapMemory(mDevice->Get(), mUniformBuffersMemory, 0, allocInfo.allocationSize, 0, &mUboMvpMapped);
+    mUboMaterialMapped = static_cast<void*>(static_cast<uint8_t*>(mUboMvpMapped) + uMvpMemSize);
 }
 
 void DrawScenePbr::CleanUpUniformBuffer() {
-    vkDestroyBuffer(mDevice->Get(), mUniformBuffer, nullptr);
+    vkDestroyBuffer(mDevice->Get(), mUboMvp, nullptr);
+    vkDestroyBuffer(mDevice->Get(), mUboMaterial, nullptr);
     vkFreeMemory(mDevice->Get(), mUniformBuffersMemory, nullptr);
 }
 
@@ -424,6 +462,7 @@ void DrawScenePbr::CreateDescriptorPool() {
     poolInfo.poolSizeCount = poolSizes.size();
     poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = 2;   // 池中最大能申请descriptorSet的个数
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     if (vkCreateDescriptorPool(mDevice->Get(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
@@ -462,16 +501,14 @@ void DrawScenePbr::CreateDescriptorSets() {
     }
 
     // 向descriptor set写入信息
-    VkDescriptorBufferInfo uniformBufferInfo = { mUniformBuffer, 0, sizeof(UboMvpMatrix) };
-    VkDescriptorImageInfo sampleImageInfo = {
-        mTexureSampler, mTestTextureImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    };
+    VkDescriptorBufferInfo uboMvpInfo = { mUboMvp, 0, sizeof(UboMvpMatrix) };
+    VkDescriptorBufferInfo uboMaterialInfo = { mUboMaterial, 0, sizeof(UniformMaterial) };
 
     std::vector<VkWriteDescriptorSet> descriptorWrites(2);
     descriptorWrites[0] = vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbr,
-        0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uniformBufferInfo);
+        0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uboMvpInfo);
     descriptorWrites[1] = vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbr,
-        1, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &sampleImageInfo);
+        1, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uboMaterialInfo);
     vkUpdateDescriptorSets(mDevice->Get(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 }
 
@@ -488,28 +525,31 @@ void DrawScenePbr::CreatePipelines()
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
     };
 
-    GraphicsPipelineConfigBase presentConfigInfo;
+    std::vector<VkPushConstantRange> nullPushConstantRanges = {};
+
+    GraphicsPipelineConfigBase presentConfigInfo{};
     presentConfigInfo.Fill();
     presentConfigInfo.SetRenderPass(mPresentRenderPass);
     presentConfigInfo.SetInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
-    mPipelinePresent = CreatePipeline(presentShaderFilePaths, presentLayoutBindings, presentConfigInfo);
-    mPipelinePresent.descriptorSizes = {
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
-    };
+    mPipelinePresent = CreatePipeline(presentConfigInfo, presentShaderFilePaths, presentLayoutBindings, nullPushConstantRanges);
 
     // drawPbrPipeline
     std::vector<SpvFilePath> pbrShaderFilePaths = {
         { setting::dirSpvFiles + std::string("DrawMesh.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
-        { setting::dirSpvFiles + std::string("DrawMesh.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
+        { setting::dirSpvFiles + std::string("DrawMeshGlossy.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
     std::vector<VkDescriptorSetLayoutBinding> pbrLayoutBindings = {
-        vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT),
-        vulkanInitializers::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
     };
 
-    GraphicsPipelineConfigBase pipelinePbrConfigInfo;
+    std::vector<VkPushConstantRange> pbrPushConstantRanges = {
+        { VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformMaterial) },
+    };
+
+    GraphicsPipelineConfigBase pipelinePbrConfigInfo{};
     pipelinePbrConfigInfo.Fill();
     pipelinePbrConfigInfo.SetRenderPass(mMainPass);
     pipelinePbrConfigInfo.SetVertexInputBindings({ Vertex3D::GetBindingDescription() });
@@ -519,11 +559,7 @@ void DrawScenePbr::CreatePipelines()
     pipelinePbrConfigInfo.mDepthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
     pipelinePbrConfigInfo.mDepthStencilState.depthBoundsTestEnable = VK_FALSE;
 
-    mPipelineDrawPbr = CreatePipeline(pbrShaderFilePaths, pbrLayoutBindings, pipelinePbrConfigInfo);
-    mPipelineDrawPbr.descriptorSizes = {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
-    };
+    mPipelineDrawPbr = CreatePipeline(pipelinePbrConfigInfo, pbrShaderFilePaths, pbrLayoutBindings, pbrPushConstantRanges);
 }
 
 void DrawScenePbr::CleanUpPipelines()
@@ -536,7 +572,8 @@ void DrawScenePbr::CreateTextures()
 {
     // 读取图片
     int texWidth, texHeight, texChannels;
-    std::string texturePath("../resource/textures/viking_room.png");
+    //std::string texturePath("../resource/textures/viking_room.png");
+    std::string texturePath("../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_basecolor.png");
     stbi_set_flip_vertically_on_load(true);
     stbi_uc* pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
@@ -652,16 +689,23 @@ void DrawScenePbr::UpdataUniformBuffer(float aspectRatio)
     uboMvpMatrixs.model = glm::mat4(1.0f);
 
     uboMvpMatrixs.view = mCamera->GetView();
+    uboMvpMatrixs.cameraPos = glm::inverse(uboMvpMatrixs.view) * glm::vec4(0.0, 0.0, 0.0, 1.0);
 
-    mCamera->SetPerspective(aspectRatio, 0.1f, 10.0f, 45.0f);
+    mCamera->SetPerspective(aspectRatio, 0.1f, 100.0f, 45.0f);
     uboMvpMatrixs.proj = mCamera->GetProjection();
     uboMvpMatrixs.proj[1][1] *= -1;
 
-    memcpy(mUniformBuffersMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
+    memcpy(mUboMvpMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
+
+    UniformMaterial uboMaterial{};
+    uboMaterial.albedo = glm::vec3(1.0, 0.5, 0.0);
+    uboMaterial.roughness = 0.7f;
+    uboMaterial.metallic = 1.0f;
+    memcpy(mUboMaterialMapped, &uboMaterial, sizeof(uboMaterial));
 }
 
-PipelineComponents DrawScenePbr::CreatePipeline(std::vector<SpvFilePath>& shaderFilePaths,
-    std::vector<VkDescriptorSetLayoutBinding>& layoutBindings, const GraphicsPipelineConfigBase& configInfo)
+PipelineComponents DrawScenePbr::CreatePipeline(const GraphicsPipelineConfigBase& configInfo, std::vector<SpvFilePath>& shaderFilePaths,
+    std::vector<VkDescriptorSetLayoutBinding>& layoutBindings, std::vector<VkPushConstantRange>& pushConstantRanges)
 {
     PipelineComponents pipeline{};
 
@@ -678,7 +722,7 @@ PipelineComponents DrawScenePbr::CreatePipeline(std::vector<SpvFilePath>& shader
 
     // pipeline layout
     VkPipelineLayoutCreateInfo layoutCreateInfo = vulkanInitializers::PipelineLayoutCreateInfo(
-        pipeline.descriptorSetLayouts, pipeline.pushConstantRanges);
+        pipeline.descriptorSetLayouts, pushConstantRanges);
     if (vkCreatePipelineLayout(mDevice->Get(), &layoutCreateInfo, nullptr, &pipeline.layout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipline layout!");
     }
@@ -697,6 +741,14 @@ PipelineComponents DrawScenePbr::CreatePipeline(std::vector<SpvFilePath>& shader
     // destroy shader
     shaderFactory.DestroyShaderProgram(spDrawTexture);
 
+    // save data
+    pipeline.descriptorSizes.clear();
+    for (int i = 0; i < layoutBindings.size(); i++) {
+        VkDescriptorPoolSize size = { layoutBindings[i].descriptorType, layoutBindings[i].descriptorCount };
+        pipeline.descriptorSizes.emplace_back(size);
+    }
+    pipeline.pushConstantRanges = pushConstantRanges;
+
     return pipeline;
 }
 
@@ -710,5 +762,42 @@ void DrawScenePbr::DestroyPipeline(PipelineComponents& pipeline)
 
     pipeline.descriptorSizes = {};
     pipeline.pushConstantRanges = {};
+}
+
+void DrawScenePbr::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input)
+{
+    // 启动Pass
+    std::array<VkClearValue, 2> clearValues = {
+        consts::CLEAR_COLOR_NAVY_FLT,
+        consts::CLEAR_DEPTH_ONE_STENCIL_ZERO
+    };
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = input.presentRenderPass;
+    renderPassInfo.framebuffer = input.swapchanFb;
+    renderPassInfo.renderArea.offset = { 0, 0 };
+    renderPassInfo.renderArea.extent = input.swapchainExtent;
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+    vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // 绑定Pipeline
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelinePresent.pipeline);
+    VkViewport viewport = { 0.0f, 0.0f, input.swapchainExtent.width, input.swapchainExtent.height, 0.0f, 1.0f };
+    vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
+    VkRect2D scissor = { { 0, 0 }, input.swapchainExtent };
+    vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
+
+    // 绑定DescriptorSet
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        mPipelinePresent.layout,
+        0, 1, &mDescriptorSetPresent,
+        0, nullptr);
+
+    //画图
+    vkCmdDraw(cmdBuf, 4, 1, 0, 0);
+
+    // 结束Pass
+    vkCmdEndRenderPass(cmdBuf);
 }
 }   // namespace render
