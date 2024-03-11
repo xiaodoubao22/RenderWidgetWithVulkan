@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <iostream>
 #include <atomic>
+#include <memory>
 
 namespace render {
 class Thread {
@@ -16,7 +17,7 @@ public:
     void Stop();
     void Destroy();
 
-    virtual void PushData(std::string& lable, void* data);
+    virtual void PushData(std::string& lable, void* data) {}
 
 private:
     void ThreadFunction();
@@ -27,7 +28,7 @@ protected:
     virtual void OnThreadDestroy() = 0;
 
 private:
-    std::thread mThread;
+    std::unique_ptr<std::thread> mThread = nullptr;
     std::condition_variable mThreadActiveCondition;
     std::mutex mThreadActiveMutex;
     bool mThreadActiveFlag = false;
