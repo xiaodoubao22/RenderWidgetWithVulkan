@@ -11,7 +11,7 @@ namespace window {
 class WindowTemplate;
 }
 
-namespace render {
+namespace framework {
 struct SwapChainSupportdetails {
     bool isValid = false;
     VkSurfaceCapabilitiesKHR capabilities = {};
@@ -67,7 +67,7 @@ private:
     std::vector<VkImage> mSwapchainImages = {};
     std::vector<VkImageView> mSwapchainImageViews = {};
 };
-}
+}   // namespace framework
 
 
 #endif // !__SWAPCHAIN_H__

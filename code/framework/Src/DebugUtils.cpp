@@ -4,7 +4,7 @@
 #include <iostream>
 #include <sstream>
 
-namespace render {
+namespace framework {
 
 DebugUtils::DebugUtils() {
 
@@ -108,4 +108,4 @@ void DebugUtils::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInf
 		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 	createInfo.pfnUserCallback = DebugCallback;
 }
-}
+}	// namespace framework

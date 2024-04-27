@@ -4,7 +4,7 @@
 #include "Thread.h"
 #include "RenderBase.h"
 #include "TestMesh.h"
-#include "SceneRenderHeaders.h"
+#include "SceneDemoDefs.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -13,7 +13,7 @@ namespace window {
 class WindowTemplate;
 }
 
-namespace render {
+namespace framework {
 class RenderThread : public Thread, public RenderBase {
 public:
     explicit RenderThread(window::WindowTemplate& w);
@@ -74,7 +74,7 @@ private:
     std::atomic<bool> mFramebufferResized = false;
 
 };
-}
+}   // namespace framework
 
 #endif // !__DRAW_MESH_THREAD_H__
 

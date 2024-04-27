@@ -8,7 +8,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace render {
+#include "SceneDemoDefs.h"
+
+namespace framework {
 DrawRotateQuad::DrawRotateQuad() {}
 
 DrawRotateQuad::~DrawRotateQuad() {}
@@ -276,49 +278,30 @@ void DrawRotateQuad::CreateDescriptorSets() {
 
 void DrawRotateQuad::CreatePipelines()
 {
-    // create shader
-    ShaderModuleFactory& shaderFactory = ShaderModuleFactory::GetInstance();
-    std::vector<SpvFilePath> shaderFilePaths = {
-        { setting::dirSpvFiles + std::string("DrawTriangleTestVert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
-        { setting::dirSpvFiles + std::string("DrawTriangleTestFrag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
-    };
-    ShaderProgram spDrawTexture = shaderFactory.CreateShaderProgramFromFiles(mDevice->Get(), shaderFilePaths);
+    PipelineFactory& pipelineFactory = PipelineFactory::GetInstance();
+    pipelineFactory.SetDevice(mDevice->Get());
 
-    // descriptor size
-    mPipeline.descriptorSizes = { { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 } };
+    // create shader
+    std::vector<ShaderFileInfo> shaderFilePaths = {
+        { GetConfig().directory.dirSpvFiles + std::string("DrawTriangleTestVert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
+        { GetConfig().directory.dirSpvFiles + std::string("DrawTriangleTestFrag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
+    };
 
     // descriptor layout
-    mPipeline.descriptorSetLayouts.resize(1);
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings = {
         vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT),
     };
-    VkDescriptorSetLayoutCreateInfo layoutInfo = vulkanInitializers::DescriptorSetLayoutCreateInfo(layoutBindings);
-    if (vkCreateDescriptorSetLayout(mDevice->Get(), &layoutInfo, nullptr, &mPipeline.descriptorSetLayouts[0]) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
 
-    // pipeline layout
-    VkPipelineLayoutCreateInfo layoutCreateInfo = vulkanInitializers::PipelineLayoutCreateInfo(
-        mPipeline.descriptorSetLayouts, mPipeline.pushConstantRanges);
-    if (vkCreatePipelineLayout(mDevice->Get(), &layoutCreateInfo, nullptr, &mPipeline.layout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create pipline layout!");
-    }
+    // push constant
+    std::vector<VkPushConstantRange> nullPushConstantRanges = {};
 
     // pipeline
-    GraphicsPipelineConfigBase configInfo;
-    configInfo.Fill();
+    GraphicsPipelineConfigInfo configInfo;
+    configInfo.SetRenderPass(mPresentRenderPass);
     configInfo.SetVertexInputBindings({ Vertex2DColor::GetBindingDescription() });
     configInfo.SetVertexInputAttributes(Vertex2DColor::getAttributeDescriptions());
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo = configInfo.Populate(mPipeline.layout, mPresentRenderPass);
-    pipelineCreateInfo.stageCount = spDrawTexture.shaderStageInfos.size();
-    pipelineCreateInfo.pStages = spDrawTexture.shaderStageInfos.data();
-    if (vkCreateGraphicsPipelines(mDevice->Get(), VK_NULL_HANDLE, 1,
-        &pipelineCreateInfo, nullptr, &mPipeline.pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
+    mPipeline = pipelineFactory.CreateGraphicsPipeline(configInfo, shaderFilePaths, layoutBindings, nullPushConstantRanges);
 
-    // destroy shader
-    shaderFactory.DestroyShaderProgram(spDrawTexture);
 }
 
 void DrawRotateQuad::CleanUpPipelines()

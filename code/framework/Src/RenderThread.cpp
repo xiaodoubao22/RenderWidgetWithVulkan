@@ -3,19 +3,16 @@
 #include "Utils.h"
 #include "DebugUtils.h"
 #include "VulkanInitializers.h"
-#include "ShaderModuleFactory.h"
 #include "Log.h"
 
 #include <iostream>
 #include <stdexcept>
 #include <array>
 
-namespace render {
+namespace framework {
 RenderThread::RenderThread(window::WindowTemplate& w) : RenderBase(w)
 {
-    //mSceneRender = new DrawSceneTest;
-    //mSceneRender = new DrawRotateQuad;
-    mSceneRender = new DrawScenePbr;
+    mSceneRender = CreateSceneRender();
 }
 
 RenderThread::~RenderThread()
@@ -25,10 +22,7 @@ RenderThread::~RenderThread()
 
 void RenderThread::OnThreadInit() {
     RenderBase::Init();
-
-    mDepthFormat = RenderBase::FindSupportedFormat(
-        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-        VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    mDepthFormat = RenderBase::FindSupportedFormat();
 
     // create render objects
     CreateSyncObjects();
@@ -211,7 +205,6 @@ void RenderThread::Resize() {
     CleanUpFramebuffers();
     CleanUpDepthResources();
 
-
     mSceneRender->OnResize(newExtent);
     mSwapchain->Recreate(newExtent);
     CreateDepthResources();
@@ -354,4 +347,4 @@ void RenderThread::CleanUpPresentRenderPass()
 {
     vkDestroyRenderPass(mDevice->Get(), mPresentRenderPass, nullptr);
 }
-}   // namespace render
+}   // namespace framework

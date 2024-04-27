@@ -1,22 +1,23 @@
-#ifndef __DRAW_SCENE_TEST_QUAD__
-#define __DRAW_SCENE_TEST_QUAD__
+#ifndef __DRAW_SCENE_PBR_H__
+#define __DRAW_SCENE_PBR_H__
 
 #include <vulkan/vulkan.h>
 
 #include "SceneRenderBase.h"
-#include "frameworkHeaders.h"
+#include "FrameworkHeaders.h"
 #include "TestMesh.h"
 #include "Camera.h"
 
-namespace render {
-class DrawSceneTest : public SceneRenderBase {
+namespace framework {
+class DrawScenePbr : public SceneRenderBase {
 public:
-    DrawSceneTest();
-    ~DrawSceneTest();
+    DrawScenePbr();
+    ~DrawScenePbr();
 
     virtual void Init(const RenderInitInfo& initInfo) override;
     virtual void CleanUp() override;
     virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
+    virtual void OnResize(VkExtent2D newExtent) override;
 
     virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) override;
     virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) override;
@@ -26,6 +27,9 @@ public:
 private:
     void CreateRenderPasses();
     void CleanUpRenderPasses();
+
+    void CreateMainFramebuffer();
+    void CleanUpMainFramebuffer();
 
     void CreateVertexBuffer();
     void CleanUpVertexBuffer();
@@ -51,11 +55,17 @@ private:
 
     void UpdataUniformBuffer(float aspectRatio);
 
+    void UpdateDescriptorSets();
+
+    // tool functions
+    void RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input);
+
 private:
     std::vector<VkCommandBuffer> mPrimaryCommandBuffers = {};
 
     // ---- render objects ----
-    PipelineComponents mPipeline = {};
+    PipelineObjecs mPipelinePresent = {};
+    PipelineObjecs mPipelineDrawPbr = {};
 
     VkCommandBuffer mCommandBuffer = VK_NULL_HANDLE;
 
@@ -68,12 +78,15 @@ private:
     VkDeviceMemory mIndexBufferMemory = VK_NULL_HANDLE;
 
     // uniform buffer
-    VkBuffer mUniformBuffer = VK_NULL_HANDLE;
+    VkBuffer mUboMvp = VK_NULL_HANDLE;
+    void* mUboMvpMapped = nullptr;
+    VkBuffer mUboMaterial = VK_NULL_HANDLE;
+    void* mUboMaterialMapped = nullptr;
     VkDeviceMemory mUniformBuffersMemory = VK_NULL_HANDLE;
-    void* mUniformBuffersMapped = nullptr;
 
     VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
-    VkDescriptorSet mDescriptorSet = VK_NULL_HANDLE;
+    VkDescriptorSet mDescriptorSetPbr = VK_NULL_HANDLE;
+    VkDescriptorSet mDescriptorSetPresent = VK_NULL_HANDLE;
 
     // test texture
     VkImage mTestTextureImage = VK_NULL_HANDLE;
@@ -81,11 +94,33 @@ private:
     VkImageView mTestTextureImageView = VK_NULL_HANDLE;
     VkSampler mTexureSampler = VK_NULL_HANDLE;
 
+    // main fb resources
+    VkImage mMainFbColorImage = VK_NULL_HANDLE;
+    VkImageView mMainFbColorImageView = VK_NULL_HANDLE;
+    VkImage mMainFbDepthImage = VK_NULL_HANDLE;
+    VkImageView mMainFbDepthImageView = VK_NULL_HANDLE;
+    VkDeviceMemory mMainFbMemory = VK_NULL_HANDLE;
+    VkFramebuffer mMainFrameBuffer = VK_NULL_HANDLE;
+    VkRenderPass mMainPass = VK_NULL_HANDLE;
+
+    const float mResolutionFactor = 0.8;
+    VkExtent2D mMainFbExtent = {};
+    const VkFormat mMainFbColorFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+    const VkFormat mMainFbDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+
     // data
     struct UboMvpMatrix {
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
+        glm::vec3 cameraPos;
+    };
+
+    struct UniformMaterial {
+        float roughness;
+        float metallic;
+        alignas(16)glm::vec3 albedo;
+        alignas(16)glm::vec3 modelOffset;
     };
 
     TestMesh* mMesh = nullptr;
@@ -101,8 +136,8 @@ private:
         { FRAMEWORK_KEY_Q, false },
         { FRAMEWORK_KEY_E, false },
     };
-    
+
 };
 }
 
-#endif // __DRAW_SCENE_TEST_QUAD__
+#endif // __DRAW_SCENE_PBR_H__

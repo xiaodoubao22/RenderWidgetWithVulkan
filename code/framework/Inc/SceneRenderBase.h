@@ -6,10 +6,10 @@
 #include <GLFW/glfw3.h>
 
 #include "Device.h"
-#include "GraphicsPipelineConfig.h"
+#include "GraphicsPipelineConfigInfo.h"
 #include "TestMesh.h"
 
-namespace render {
+namespace framework {
 struct RenderInitInfo {
     VkRenderPass presentRenderPass = VK_NULL_HANDLE;
     Device* device = nullptr;
@@ -69,7 +69,7 @@ protected:
     VkRenderPass mPresentRenderPass = VK_NULL_HANDLE;
 
 };
-}
+}   // namespace framework
 
 #endif // __SCENE_RENDER_BASE__
 

@@ -9,7 +9,7 @@
 
 #include <vulkan/vulkan.h>
 
-namespace render {
+namespace framework {
 class RenderBase {
 public:
     RenderBase(window::WindowTemplate& w);
@@ -34,8 +34,7 @@ private:
     bool CheckExtensionSupport(const std::vector<const char*>& target);
 
 protected:
-    VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates,
-        VkImageTiling tiling, VkFormatFeatureFlags features);
+    VkFormat FindSupportedFormat();
 
 protected:
     bool mEnableValidationLayer = false;
@@ -58,7 +57,7 @@ protected:
     std::vector<VkFramebuffer> mSwapchainFramebuffers = {};
 
 };
-}
+}   // namespace framework
 
 #endif // !__RENDER_BASE__
 

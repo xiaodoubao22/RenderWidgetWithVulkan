@@ -7,7 +7,7 @@
 #include <atomic>
 #include <memory>
 
-namespace render {
+namespace framework {
 class Thread {
 public:
     Thread();
@@ -34,7 +34,7 @@ private:
     bool mThreadActiveFlag = false;
     bool mIsDestroying = false;
 };
-}
+}   // namespace framework
 
 
 #endif // !__THREAD_H__

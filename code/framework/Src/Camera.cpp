@@ -1,6 +1,6 @@
 #include "Camera.h"
 
-namespace render {
+namespace framework {
 Camera::Camera() {
     mYaw = 0.0f;
     mPitch = 0.0f;

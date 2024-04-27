@@ -3,7 +3,7 @@
 :: 设置环境变量
 @set PATH=%glslc%;%PATH%
 
-@set DemoShaderDir=..\code\demo\Shaders
+@set DemoShaderDir=..\code\scene_demo\Shaders
 glslc %DemoShaderDir%\DrawTriangleTest.vert -o ..\spv_files\DrawTriangleTestVert.spv
 glslc %DemoShaderDir%\DrawTriangleTest.frag -o ..\spv_files\DrawTriangleTestFrag.spv
 

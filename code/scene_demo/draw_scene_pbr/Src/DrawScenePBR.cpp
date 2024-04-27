@@ -13,8 +13,9 @@
 #include <stb_image.h>
 
 #include "Log.h"
+#include "SceneDemoDefs.h"
 
-namespace render {
+namespace framework {
 DrawScenePbr::DrawScenePbr()
 {
     mMesh = new TestMesh;
@@ -162,13 +163,10 @@ void DrawScenePbr::OnResize(VkExtent2D newExtent)
     mMainFbExtent.width *= mResolutionFactor;
     mMainFbExtent.height *= mResolutionFactor;
 
-    vkFreeDescriptorSets(mDevice->Get(), mDescriptorPool, 1, &mDescriptorSetPbr);
-    vkFreeDescriptorSets(mDevice->Get(), mDescriptorPool, 1, &mDescriptorSetPresent);
-
     CleanUpMainFramebuffer();
     CreateMainFramebuffer();
 
-    CreateDescriptorSets();
+    UpdateDescriptorSets();
 }
 
 void DrawScenePbr::GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt)
@@ -514,30 +512,30 @@ void DrawScenePbr::CreateDescriptorSets() {
 
 void DrawScenePbr::CreatePipelines()
 {
-    // present pipeline
-    std::vector<SpvFilePath> presentShaderFilePaths = {
-        { setting::dirSpvFiles + std::string("ScreenQuad.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
-        { setting::dirSpvFiles + std::string("ScreenQuad.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
+
+    PipelineFactory& pipelineFactory = PipelineFactory::GetInstance();
+    pipelineFactory.SetDevice(mDevice->Get());
+
+    std::vector<ShaderFileInfo> presentShaderFilePaths = {
+        { GetConfig().directory.dirSpvFiles + std::string("ScreenQuad.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
+        { GetConfig().directory.dirSpvFiles + std::string("ScreenQuad.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
     std::vector<VkDescriptorSetLayoutBinding> presentLayoutBindings = {
-        vulkanInitializers::DescriptorSetLayoutBinding(0,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
     };
 
     std::vector<VkPushConstantRange> nullPushConstantRanges = {};
 
-    GraphicsPipelineConfigBase presentConfigInfo{};
-    presentConfigInfo.Fill();
+    GraphicsPipelineConfigInfo presentConfigInfo{};
     presentConfigInfo.SetRenderPass(mPresentRenderPass);
     presentConfigInfo.SetInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
-    mPipelinePresent = CreatePipeline(presentConfigInfo, presentShaderFilePaths, presentLayoutBindings, nullPushConstantRanges);
+    mPipelinePresent = pipelineFactory.CreateGraphicsPipeline(presentConfigInfo, presentShaderFilePaths, presentLayoutBindings, nullPushConstantRanges);
 
-    // drawPbrPipeline
-    std::vector<SpvFilePath> pbrShaderFilePaths = {
-        { setting::dirSpvFiles + std::string("DrawMesh.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
-        { setting::dirSpvFiles + std::string("DrawMeshGlossy.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
+    std::vector<ShaderFileInfo> pbrShaderFilePaths = {
+        { GetConfig().directory.dirSpvFiles + std::string("DrawMesh.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT},
+        { GetConfig().directory.dirSpvFiles + std::string("DrawMeshGlossy.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
     std::vector<VkDescriptorSetLayoutBinding> pbrLayoutBindings = {
@@ -549,8 +547,7 @@ void DrawScenePbr::CreatePipelines()
         { VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformMaterial) },
     };
 
-    GraphicsPipelineConfigBase pipelinePbrConfigInfo{};
-    pipelinePbrConfigInfo.Fill();
+    GraphicsPipelineConfigInfo pipelinePbrConfigInfo{};
     pipelinePbrConfigInfo.SetRenderPass(mMainPass);
     pipelinePbrConfigInfo.SetVertexInputBindings({ Vertex3D::GetBindingDescription() });
     pipelinePbrConfigInfo.SetVertexInputAttributes(Vertex3D::getAttributeDescriptions());
@@ -559,13 +556,16 @@ void DrawScenePbr::CreatePipelines()
     pipelinePbrConfigInfo.mDepthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
     pipelinePbrConfigInfo.mDepthStencilState.depthBoundsTestEnable = VK_FALSE;
 
-    mPipelineDrawPbr = CreatePipeline(pipelinePbrConfigInfo, pbrShaderFilePaths, pbrLayoutBindings, pbrPushConstantRanges);
+    mPipelineDrawPbr = pipelineFactory.CreateGraphicsPipeline(pipelinePbrConfigInfo, pbrShaderFilePaths, pbrLayoutBindings, pbrPushConstantRanges);
 }
 
 void DrawScenePbr::CleanUpPipelines()
 {
-    DestroyPipeline(mPipelineDrawPbr);
-    DestroyPipeline(mPipelinePresent);
+    PipelineFactory& pipelineFactory = PipelineFactory::GetInstance();
+    pipelineFactory.SetDevice(mDevice->Get());
+
+    pipelineFactory.DestroyPipelineObjecst(mPipelineDrawPbr);
+    pipelineFactory.DestroyPipelineObjecst(mPipelinePresent);
 }
 
 void DrawScenePbr::CreateTextures()
@@ -704,64 +704,15 @@ void DrawScenePbr::UpdataUniformBuffer(float aspectRatio)
     memcpy(mUboMaterialMapped, &uboMaterial, sizeof(uboMaterial));
 }
 
-PipelineComponents DrawScenePbr::CreatePipeline(const GraphicsPipelineConfigBase& configInfo, std::vector<SpvFilePath>& shaderFilePaths,
-    std::vector<VkDescriptorSetLayoutBinding>& layoutBindings, std::vector<VkPushConstantRange>& pushConstantRanges)
+void DrawScenePbr::UpdateDescriptorSets()
 {
-    PipelineComponents pipeline{};
-
-    // create shader
-    ShaderModuleFactory& shaderFactory = ShaderModuleFactory::GetInstance();
-    ShaderProgram spDrawTexture = shaderFactory.CreateShaderProgramFromFiles(mDevice->Get(), shaderFilePaths);
-
-    // descriptor layout
-    pipeline.descriptorSetLayouts.resize(1);
-    VkDescriptorSetLayoutCreateInfo layoutInfo = vulkanInitializers::DescriptorSetLayoutCreateInfo(layoutBindings);
-    if (vkCreateDescriptorSetLayout(mDevice->Get(), &layoutInfo, nullptr, &pipeline.descriptorSetLayouts[0]) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
-
-    // pipeline layout
-    VkPipelineLayoutCreateInfo layoutCreateInfo = vulkanInitializers::PipelineLayoutCreateInfo(
-        pipeline.descriptorSetLayouts, pushConstantRanges);
-    if (vkCreatePipelineLayout(mDevice->Get(), &layoutCreateInfo, nullptr, &pipeline.layout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create pipline layout!");
-    }
-
-    // pipeline
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo = configInfo.Populate();
-    pipelineCreateInfo.stageCount = spDrawTexture.shaderStageInfos.size();
-    pipelineCreateInfo.pStages = spDrawTexture.shaderStageInfos.data();
-    pipelineCreateInfo.layout = pipeline.layout;
-
-    if (vkCreateGraphicsPipelines(mDevice->Get(), VK_NULL_HANDLE, 1,
-        &pipelineCreateInfo, nullptr, &pipeline.pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
-
-    // destroy shader
-    shaderFactory.DestroyShaderProgram(spDrawTexture);
-
-    // save data
-    pipeline.descriptorSizes.clear();
-    for (int i = 0; i < layoutBindings.size(); i++) {
-        VkDescriptorPoolSize size = { layoutBindings[i].descriptorType, layoutBindings[i].descriptorCount };
-        pipeline.descriptorSizes.emplace_back(size);
-    }
-    pipeline.pushConstantRanges = pushConstantRanges;
-
-    return pipeline;
-}
-
-void DrawScenePbr::DestroyPipeline(PipelineComponents& pipeline)
-{
-    vkDestroyPipeline(mDevice->Get(), pipeline.pipeline, nullptr);
-    vkDestroyPipelineLayout(mDevice->Get(), pipeline.layout, nullptr);
-    for (auto setLayout : pipeline.descriptorSetLayouts) {
-        vkDestroyDescriptorSetLayout(mDevice->Get(), setLayout, nullptr);
-    }
-
-    pipeline.descriptorSizes = {};
-    pipeline.pushConstantRanges = {};
+    VkDescriptorImageInfo sampleMainFbColorImageInfo = {
+    mTexureSampler, mMainFbColorImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+    std::vector<VkWriteDescriptorSet> presentDescriptorWrites(1);
+    presentDescriptorWrites[0] = vulkanInitializers::WriteDescriptorSet(mDescriptorSetPresent,
+        0, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &sampleMainFbColorImageInfo);
+    vkUpdateDescriptorSets(mDevice->Get(), presentDescriptorWrites.size(), presentDescriptorWrites.data(), 0, nullptr);
 }
 
 void DrawScenePbr::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input)

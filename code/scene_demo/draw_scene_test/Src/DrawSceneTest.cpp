@@ -13,8 +13,9 @@
 #include <stb_image.h>
 
 #include "Log.h"
+#include "SceneDemoDefs.h"
 
-namespace render {
+namespace framework {
 DrawSceneTest::DrawSceneTest()
 {
     mMesh = new TestMesh;
@@ -80,7 +81,6 @@ std::vector<VkCommandBuffer>& DrawSceneTest::RecordCommand(const RenderInputInfo
     // 启动Pass
     std::array<VkClearValue, 2> clearValues = {
         consts::CLEAR_COLOR_NAVY_FLT,
-        //consts::CLEAR_COLOR_WHITE_FLT,
         consts::CLEAR_DEPTH_ONE_STENCIL_ZERO
     };
     VkRenderPassBeginInfo renderPassInfo{};
@@ -325,41 +325,26 @@ void DrawSceneTest::CreateDescriptorSets() {
 
 void DrawSceneTest::CreatePipelines()
 {
+    PipelineFactory& pipelineFactory = PipelineFactory::GetInstance();
+    pipelineFactory.SetDevice(mDevice->Get());
     // create shader
-    ShaderModuleFactory& shaderFactory = ShaderModuleFactory::GetInstance();
-    std::vector<SpvFilePath> shaderFilePaths = {
-        { setting::dirSpvFiles + std::string("DrawMesh.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
-        { setting::dirSpvFiles + std::string("DrawMesh.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
-    };
-    ShaderProgram spDrawTexture = shaderFactory.CreateShaderProgramFromFiles(mDevice->Get(), shaderFilePaths);
-
-    // descriptor size
-    mPipeline.descriptorSizes = {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+    std::vector<ShaderFileInfo> shaderFilePaths = {
+        { GetConfig().directory.dirSpvFiles + std::string("DrawMesh.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
+        { GetConfig().directory.dirSpvFiles + std::string("DrawMesh.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
     // descriptor layout
-    mPipeline.descriptorSetLayouts.resize(1);
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings = {
         vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT),
         vulkanInitializers::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
     };
-    VkDescriptorSetLayoutCreateInfo layoutInfo = vulkanInitializers::DescriptorSetLayoutCreateInfo(layoutBindings);
-    if (vkCreateDescriptorSetLayout(mDevice->Get(), &layoutInfo, nullptr, &mPipeline.descriptorSetLayouts[0]) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
 
-    // pipeline layout
-    VkPipelineLayoutCreateInfo layoutCreateInfo = vulkanInitializers::PipelineLayoutCreateInfo(
-        mPipeline.descriptorSetLayouts, mPipeline.pushConstantRanges);
-    if (vkCreatePipelineLayout(mDevice->Get(), &layoutCreateInfo, nullptr, &mPipeline.layout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create pipline layout!");
-    }
+    // push constant
+    std::vector<VkPushConstantRange> nullPushConstantRanges = {};
 
     // pipeline
-    GraphicsPipelineConfigBase configInfo;
-    configInfo.Fill();
+    GraphicsPipelineConfigInfo configInfo;
+    configInfo.SetRenderPass(mPresentRenderPass);
     configInfo.SetVertexInputBindings({ Vertex3D::GetBindingDescription() });
     configInfo.SetVertexInputAttributes(Vertex3D::getAttributeDescriptions());
     configInfo.mDepthStencilState.depthTestEnable = VK_TRUE;
@@ -367,17 +352,8 @@ void DrawSceneTest::CreatePipelines()
     configInfo.mDepthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
     configInfo.mDepthStencilState.depthBoundsTestEnable = VK_FALSE;
 
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo = configInfo.Populate(mPipeline.layout, mPresentRenderPass);
-    pipelineCreateInfo.stageCount = spDrawTexture.shaderStageInfos.size();
-    pipelineCreateInfo.pStages = spDrawTexture.shaderStageInfos.data();
+    mPipeline = pipelineFactory.CreateGraphicsPipeline(configInfo, shaderFilePaths, layoutBindings, nullPushConstantRanges);
 
-    if (vkCreateGraphicsPipelines(mDevice->Get(), VK_NULL_HANDLE, 1,
-        &pipelineCreateInfo, nullptr, &mPipeline.pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
-
-    // destroy shader
-    shaderFactory.DestroyShaderProgram(spDrawTexture);
 }
 
 void DrawSceneTest::CleanUpPipelines()

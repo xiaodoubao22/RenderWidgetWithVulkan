@@ -6,39 +6,18 @@
 
 #include <vulkan/vulkan.h>
 
-namespace render {
-enum GraphicsPipelineType {
-    GRAPHICS_PIPELINE_BASE = 0,
-    GRAPHICS_PIPELINE_VRS,
-};
+namespace framework {
 
-struct PipelineComponents {
-    VkPipeline pipeline = VK_NULL_HANDLE;
-    VkPipelineLayout layout = VK_NULL_HANDLE;
-    std::vector<VkDescriptorPoolSize> descriptorSizes = {};
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = {};
-    std::vector<VkPushConstantRange> pushConstantRanges = {};
-};
-
-class GraphicsPipelineConfigBase {
+class GraphicsPipelineConfigInfo {
 public:
-    GraphicsPipelineConfigBase() {};
-    ~GraphicsPipelineConfigBase() {};
+    GraphicsPipelineConfigInfo();
+    ~GraphicsPipelineConfigInfo() {};
 
-    GraphicsPipelineType GetType()
-    {
-        return mType;
-    }
-    bool IsValid()
-    {
-        return mIsValid;
-    }
-
-    virtual VkGraphicsPipelineCreateInfo Populate(VkPipelineLayout pipelineLayout,
+    VkGraphicsPipelineCreateInfo Populate(VkPipelineLayout pipelineLayout,
         VkRenderPass renderPass, uint32_t subPassIndex = 0);
-    virtual VkGraphicsPipelineCreateInfo Populate() const;
-    virtual void Fill();
+    VkGraphicsPipelineCreateInfo Populate() const;
 
+    // modity config
     bool AddDynamicState(VkDynamicState state);
     bool SetVertexInputBindings(std::vector<VkVertexInputBindingDescription>&& bindings);
     bool SetVertexInputAttributes(std::vector<VkVertexInputAttributeDescription>&& attributes);
@@ -56,10 +35,10 @@ public:
         mPipelineLayout = pipelineLayout;
     }
 
-public:
-    bool mIsValid = false;
-    GraphicsPipelineType mType = GRAPHICS_PIPELINE_BASE;
+private:
+    void FillDefault();
 
+public:
     VkPipelineVertexInputStateCreateInfo mVertexInputState = {};
     std::vector<VkVertexInputBindingDescription> mBindings = {};
     std::vector<VkVertexInputAttributeDescription> mAttributes = {};
@@ -88,7 +67,7 @@ public:
 
     VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
 };
-}
+}   // namespace framework
 
 #endif // !__GRAPHICS_PIPELINE_CONFIG_INFO__
 

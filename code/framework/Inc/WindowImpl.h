@@ -21,12 +21,12 @@ private:
     virtual void OnKeyEvent(int key, int scancode, int action, int mods) override;
 
 private:
-    render::RenderThread* mRenderThread = nullptr;
+    framework::RenderThread* mRenderThread = nullptr;
     //render::Thread* mRenderThread = nullptr;
 
     bool mIsMinimized = false;
 };
-}
+}   // namespace window
 
 
 

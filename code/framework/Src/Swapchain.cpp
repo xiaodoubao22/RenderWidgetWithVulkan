@@ -1,12 +1,14 @@
 #include "Swapchain.h"
-#include "Utils.h"
-#include "WindowTemplate.h"
 
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
 
-namespace render {
+#include "Utils.h"
+#include "WindowTemplate.h"
+#include "SceneDemoDefs.h"
+
+namespace framework {
 Swapchain::Swapchain() {
 
 }
@@ -128,7 +130,7 @@ void Swapchain::CreateSwapChain(VkExtent2D windowExtent, VkSwapchainKHR oldSwapc
 	VkExtent2D swapchainExtent = ChooseSwapExtent(windowExtent, swapChainSupport.capabilities);
 	// 交换链中图像个数
 	uint32_t imageCount = std::clamp<uint32_t>(
-		setting::swapchainImageCount,
+		GetConfig().swapchain.imageCount,
 		swapChainSupport.capabilities.minImageCount, 
 		swapChainSupport.capabilities.maxImageCount);
 	// 模式
@@ -202,8 +204,8 @@ VkSurfaceFormatKHR Swapchain::ChooseSwapSurfaceFormat(const std::vector<VkSurfac
 	// 选择合适的surface格式
 	for (const auto& availableFormat : availableFormats) {
 		// 格式 + 颜色空间
-		if (availableFormat.format == setting::swapchainSurfaceFormat.format &&
-			availableFormat.colorSpace == setting::swapchainSurfaceFormat.colorSpace) {
+		if (availableFormat.format == GetConfig().swapchain.surfaceFormat.format &&
+			availableFormat.colorSpace == GetConfig().swapchain.surfaceFormat.colorSpace) {
 			return availableFormat;
 		}
 	}
@@ -212,7 +214,7 @@ VkSurfaceFormatKHR Swapchain::ChooseSwapSurfaceFormat(const std::vector<VkSurfac
 
 VkPresentModeKHR Swapchain::ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availiablePresentModes) {
 	for (const auto& availiablePresentMode : availiablePresentModes) {
-		if (availiablePresentMode == setting::presentMode) {
+		if (availiablePresentMode == GetConfig().swapchain.presentMode) {
 			return availiablePresentMode;
 		}
 	}
@@ -245,4 +247,4 @@ VkSharingMode Swapchain::ChooseSharingMode(const PhysicalDevice::QueueFamilyIndi
 		return VK_SHARING_MODE_EXCLUSIVE;	// 图像只能被一个队列族使用，换队列族需要显式转移所有权
 	}
 }
-}
+}	// namespace framework

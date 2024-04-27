@@ -4,9 +4,9 @@
 #include <vulkan/vulkan.h>
 
 #include "SceneRenderBase.h"
-#include "frameworkHeaders.h"
+#include "FrameworkHeaders.h"
 
-namespace render {
+namespace framework {
 class DrawTextureMsaa : public SceneRenderBase {
 public:
     DrawTextureMsaa() {}

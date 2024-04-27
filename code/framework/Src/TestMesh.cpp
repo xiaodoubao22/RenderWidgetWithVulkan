@@ -16,14 +16,14 @@
 #include "Utils.h"
 
 namespace std {
-template<> struct hash<render::Vertex3D> {
-	size_t operator()(render::Vertex3D const& vertex) const {
+template<> struct hash<framework::Vertex3D> {
+	size_t operator()(framework::Vertex3D const& vertex) const {
 		return (hash<glm::vec3>()(vertex.position) ^ (hash<glm::vec2>()(vertex.texCoord) << 1)) >> 1;
 	}
 };
 }	// namespace std
 
-namespace render {
+namespace framework {
 TestMesh::TestMesh() {}
 TestMesh::~TestMesh() {}
 
@@ -118,5 +118,5 @@ void TestMesh::GenerateSphere(float radius, glm::vec3 center, glm::uvec2 gridNum
 	}
 
 }
-}   // namespace render
+}   // namespace framework
 

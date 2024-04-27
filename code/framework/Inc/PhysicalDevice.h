@@ -8,7 +8,7 @@
 
 #include <vulkan/vulkan.h>
 
-namespace render {
+namespace framework {
 extern struct SwapChainSupportdetails;
     
 class PhysicalDevice {
@@ -84,6 +84,7 @@ public:
     void* GetRequestedExtensionFeatureHeadPtr() { return mRequestedExtensionFeatureHeadPtr; }
 
 private:
+    void ReadRequiredExtensions();
     void PickPhysicalDevices();
 
     // tool functions
@@ -105,6 +106,6 @@ private:
     std::map<VkStructureType, std::shared_ptr<void>> mExtensionsFeatures = {};
     void* mRequestedExtensionFeatureHeadPtr = nullptr;
 };
-}
+}   // namespace framework
 
 #endif // !__PHYSICAL_DEVICE_H__

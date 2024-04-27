@@ -3,7 +3,7 @@
 
 #include <vulkan/vulkan.h>
 
-namespace render {
+namespace framework {
 class DebugUtils {
 public:
     DebugUtils();
@@ -32,7 +32,7 @@ private:
     // instance
     VkDebugUtilsMessengerEXT mDebugUtilsMessenger = VK_NULL_HANDLE;
 };
-}
+}   // namespace framework
 
 #endif // !__DEBUG_UTILS_H__
 

@@ -1,18 +1,11 @@
 #include "WindowImpl.h"
 #include "Utils.h"
-
-#include "DrawTextureThread.h"
-#include "DrawPipelineShadingRateThread.h"
-#include "DrawAttachmentShadingRateThread.h"
 #include "RenderThread.h"
 
 namespace window {
 WindowImpl::WindowImpl(bool resizable) : WindowTemplate(resizable)
 {
-    //mRenderThread = new render::DrawTextureThread(*this);
-    //mRenderThread = new render::DrawPipelineShadingRateThread(*this);
-    //mRenderThread = new render::DrawAttachmentShadingRateThread(*this);
-    mRenderThread = new render::RenderThread(*this);
+    mRenderThread = new framework::RenderThread(*this);
 }
 
 WindowImpl::~WindowImpl()

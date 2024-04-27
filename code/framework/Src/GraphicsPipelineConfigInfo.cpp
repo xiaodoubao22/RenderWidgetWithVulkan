@@ -1,9 +1,15 @@
-#include "GraphicsPipelineConfig.h"
+#include "GraphicsPipelineConfigInfo.h"
 #include "TestMesh.h"
 #include "VulkanInitializers.h"
+#include "Log.h"
 
-namespace render {
-VkGraphicsPipelineCreateInfo GraphicsPipelineConfigBase::Populate(VkPipelineLayout pipelineLayout,
+namespace framework {
+GraphicsPipelineConfigInfo::GraphicsPipelineConfigInfo()
+{
+	FillDefault();
+};
+
+VkGraphicsPipelineCreateInfo GraphicsPipelineConfigInfo::Populate(VkPipelineLayout pipelineLayout,
 	VkRenderPass renderPass, uint32_t subPassIndex)
 {
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -24,7 +30,7 @@ VkGraphicsPipelineCreateInfo GraphicsPipelineConfigBase::Populate(VkPipelineLayo
 	return pipelineInfo;
 }
 
-VkGraphicsPipelineCreateInfo GraphicsPipelineConfigBase::Populate() const
+VkGraphicsPipelineCreateInfo GraphicsPipelineConfigInfo::Populate() const
 {
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -44,7 +50,43 @@ VkGraphicsPipelineCreateInfo GraphicsPipelineConfigBase::Populate() const
 	return pipelineInfo;
 }
 
-void GraphicsPipelineConfigBase::Fill()
+bool GraphicsPipelineConfigInfo::AddDynamicState(VkDynamicState state)
+{
+	mDynamicStates.emplace_back(state);
+	mDynamicState = vulkanInitializers::PipelineDynamicStateCreateInfo(mDynamicStates);
+	return true;
+}
+
+bool GraphicsPipelineConfigInfo::SetVertexInputBindings(std::vector<VkVertexInputBindingDescription>&& bindings)
+{
+	mBindings = bindings;
+	mVertexInputState.vertexBindingDescriptionCount = mBindings.size();
+	mVertexInputState.pVertexBindingDescriptions = mBindings.size() == 0 ? nullptr : mBindings.data();
+	return true;
+}
+
+bool GraphicsPipelineConfigInfo::SetVertexInputAttributes(std::vector<VkVertexInputAttributeDescription>&& attributes)
+{
+	mAttributes = attributes;
+	mVertexInputState.vertexAttributeDescriptionCount = mAttributes.size();
+	mVertexInputState.pVertexAttributeDescriptions = mAttributes.size() == 0 ? nullptr : mAttributes.data();
+	return true;
+}
+
+bool GraphicsPipelineConfigInfo::SetRasterizationSamples(VkSampleCountFlagBits sampleCount)
+{
+	mMultisampleState.rasterizationSamples = sampleCount;
+	return true;
+}
+
+bool GraphicsPipelineConfigInfo::SetInputAssemblyState(VkPrimitiveTopology topology, VkBool32 primitiveRestart)
+{
+	mInputAssemblyState.topology = topology;
+	mInputAssemblyState.primitiveRestartEnable = primitiveRestart;
+	return true;
+}
+
+void GraphicsPipelineConfigInfo::FillDefault()
 {
 	mBindings = {};
 	mAttributes = {};
@@ -61,7 +103,7 @@ void GraphicsPipelineConfigBase::Fill()
 	mMultisampleState = vulkanInitializers::PipelineMultisampleStateCreateInfo();
 
 	mDepthStencilState = vulkanInitializers::PipelineDepthStencilStateCreateInfo();
-		
+
 	mAttachments = { vulkanInitializers::PipelineColorBlendAttachmentState() };
 	mColorBlendState = vulkanInitializers::PipelineColorBlendStateCreateInfo(mAttachments);
 
@@ -70,58 +112,6 @@ void GraphicsPipelineConfigBase::Fill()
 		VK_DYNAMIC_STATE_SCISSOR,
 	};
 	mDynamicState = vulkanInitializers::PipelineDynamicStateCreateInfo(mDynamicStates);
-
-	mIsValid = true;
 }
 
-bool GraphicsPipelineConfigBase::AddDynamicState(VkDynamicState state)
-{
-	if (!mIsValid) {
-		return false;
-	}
-	mDynamicStates.emplace_back(state);
-	mDynamicState = vulkanInitializers::PipelineDynamicStateCreateInfo(mDynamicStates);
-	return true;
-}
-
-bool GraphicsPipelineConfigBase::SetVertexInputBindings(std::vector<VkVertexInputBindingDescription>&& bindings)
-{
-	if (!mIsValid) {
-		return false;
-	}
-	mBindings = bindings;
-	mVertexInputState.vertexBindingDescriptionCount = mBindings.size();
-	mVertexInputState.pVertexBindingDescriptions = mBindings.size() == 0 ? nullptr : mBindings.data();
-	return true;
-}
-
-bool GraphicsPipelineConfigBase::SetVertexInputAttributes(std::vector<VkVertexInputAttributeDescription>&& attributes)
-{
-	if (!mIsValid) {
-		return false;
-	}
-	mAttributes = attributes;
-	mVertexInputState.vertexAttributeDescriptionCount = mAttributes.size();
-	mVertexInputState.pVertexAttributeDescriptions = mAttributes.size() == 0 ? nullptr : mAttributes.data();
-	return true;
-}
-
-bool GraphicsPipelineConfigBase::SetRasterizationSamples(VkSampleCountFlagBits sampleCount)
-{
-	if (!mIsValid) {
-		return false;
-	}
-	mMultisampleState.rasterizationSamples = sampleCount;
-	return true;
-}
-
-bool GraphicsPipelineConfigBase::SetInputAssemblyState(VkPrimitiveTopology topology, VkBool32 primitiveRestart)
-{
-	if (!mIsValid) {
-		return false;
-	}
-	mInputAssemblyState.topology = topology;
-	mInputAssemblyState.primitiveRestartEnable = primitiveRestart;
-	return true;
-}
-}
+}	// namespace framework

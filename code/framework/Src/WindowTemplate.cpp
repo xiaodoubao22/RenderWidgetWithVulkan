@@ -2,22 +2,24 @@
 #include <stdexcept>
 #include <iostream>
 #include "Utils.h"
+#include "SceneDemoDefs.h"
 
 namespace window {
 WindowTemplate::WindowTemplate(bool resizable) {
+    framework::SceneDemoConfig& config = GetConfig();
     // 初始化GLFW窗口
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);	// 不要创建OpenGL上下文
     glfwWindowHint(GLFW_RESIZABLE, resizable);		// 禁止调整窗口大小
-    mWindow = glfwCreateWindow(setting::WINDOW_WIDTH, setting::WINDOW_HEIGHT, "render widget", nullptr, nullptr);
-    
+    mWindow = glfwCreateWindow(config.window.width, config.window.height, "render widget", nullptr, nullptr);
+
     glfwSetWindowUserPointer(mWindow, this);
     glfwSetFramebufferSizeCallback(mWindow, FramebufferSizeCallback);
     glfwSetMouseButtonCallback(mWindow, MouseButtonCallback);
     glfwSetCursorPosCallback(mWindow, CursorPosCallback);
     glfwSetKeyCallback(mWindow, KeyCallback);
 
-    glfwSetWindowSizeLimits(mWindow, 200, 200, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    glfwSetWindowSizeLimits(mWindow, config.window.minWidth, config.window.minHeight, GLFW_DONT_CARE, GLFW_DONT_CARE);
 }
 
 WindowTemplate::~WindowTemplate() {

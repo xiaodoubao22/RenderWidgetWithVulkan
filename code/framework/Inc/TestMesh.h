@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 
-namespace render {
+namespace framework {
 struct Vertex2DColor {
     glm::vec2 position;
     glm::vec3 color;

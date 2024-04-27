@@ -4,10 +4,10 @@
 #include <vulkan/vulkan.h>
 
 #include "SceneRenderBase.h"
-#include "frameworkHeaders.h"
+#include "FrameworkHeaders.h"
 #include "TestMesh.h"
 
-namespace render {
+namespace framework {
 class DrawRotateQuad : public SceneRenderBase {
 public:
     DrawRotateQuad();
@@ -46,7 +46,7 @@ private:
     std::vector<VkCommandBuffer> mPrimaryCommandBuffers = {};
 
     // ---- render objects ----
-    PipelineComponents mPipeline = {};
+    PipelineObjecs mPipeline = {};
 
     VkCommandBuffer mCommandBuffer = VK_NULL_HANDLE;
 
@@ -84,6 +84,6 @@ private:
         0, 1, 2, 2, 3, 0
     };
 };
-}
+}   // namespace framework
 
 #endif // __DRAW_ROTATE_QUAD__

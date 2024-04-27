@@ -57,6 +57,6 @@ protected:
     GLFWwindow* mWindow = nullptr;
 
 };
-}
+}   // namespace window
 
 #endif // !__WINDOW_TEMPLATE_H__

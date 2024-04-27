@@ -7,7 +7,7 @@
 
 #include "PhysicalDevice.h"
 
-namespace render {
+namespace framework {
 
 class Device {
 public:
@@ -82,7 +82,7 @@ private:
     // info
     PhysicalDevice::QueueFamilyIndices mQueueFamilyIndices = {};
 };
-}
+}   // namespace framework
 
 
 #endif // !__DEVICE_H__

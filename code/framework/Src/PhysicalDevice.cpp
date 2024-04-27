@@ -4,10 +4,12 @@
 #include <iostream>
 #include <vector>
 
+#include "Log.h"
 #include "Utils.h"
 #include "Swapchain.h"
+#include "SceneDemoDefs.h"
 
-namespace render {
+namespace framework {
 PhysicalDevice::PhysicalDevice() {
 
 }
@@ -29,6 +31,7 @@ void PhysicalDevice::Init(VkInstance instance, VkSurfaceKHR supportedSurface) {
 	mInstance = instance;
 	mSupportedSurface = supportedSurface;
 
+	ReadRequiredExtensions();
 	PickPhysicalDevices();
 }
 
@@ -102,6 +105,15 @@ uint32_t PhysicalDevice::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFla
 	throw std::runtime_error("failed to find suitable memory type!");
 }
 
+void PhysicalDevice::ReadRequiredExtensions()
+{
+	mDeviceExtensions = {};
+
+	std::vector<const char*>& demoRequiredExtensions = GetConfig().extension.deviceExtensions;
+	mDeviceExtensions.insert(mDeviceExtensions.end(),
+		demoRequiredExtensions.begin(), demoRequiredExtensions.end());
+}
+
 void PhysicalDevice::PickPhysicalDevices() {
 	// 获取所有物理设备
 	uint32_t deviceCount = 0;
@@ -127,10 +139,10 @@ void PhysicalDevice::PickPhysicalDevices() {
 	mQueueFamilyIndices = FindQueueFamilies(mPhysicalDevice);	// 保存队列族编号
 
 	// 输出选择结果
-	std::cout << "--------------- pick GPU success ---------------\n";
+	LOGI("--------------- pick GPU success ---------------");
 	VkPhysicalDeviceProperties deviceProperties;
 	vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProperties);
-	std::cout << "device name: " << deviceProperties.deviceName << std::endl;
+	LOGI("device name: %s", deviceProperties.deviceName);
 	utils::PrintStringList(mDeviceExtensions, "enable device extensions:");
 
 	uint32_t extensionCount;
@@ -142,7 +154,7 @@ void PhysicalDevice::PickPhysicalDevices() {
 		availableExtensionsNames.push_back(extension.extensionName);
 	}
 	utils::PrintStringList(availableExtensionsNames, "availiable device extensions:");
-	std::cout << "------------------------------------------------\n\n";
+	LOGI("------------------------------------------------\n");
 }
 
 bool PhysicalDevice::IsDeviceSuatiable(VkPhysicalDevice device) {
@@ -150,16 +162,16 @@ bool PhysicalDevice::IsDeviceSuatiable(VkPhysicalDevice device) {
 	vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
 	// 显卡类型要求
-	if (setting::defaultDeviceType != VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM &&	// 等于MAX_ENUM视为无要求
-		setting::defaultDeviceType != deviceProperties.deviceType) {
-		std::cout << deviceProperties.deviceName << " type not suitable \n";
+	if (GetConfig().phisicalDevice.defaultDeviceType != VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM &&	// 等于MAX_ENUM视为无要求
+		GetConfig().phisicalDevice.defaultDeviceType != deviceProperties.deviceType) {
+		LOGI("%s type not suitable", deviceProperties.deviceName);
 		return false;
 	}
 
 	// 队列种类不够，不能用
 	QueueFamilyIndices indices = FindQueueFamilies(device);
 	if (!indices.IsComplete()) {
-		std::cout << deviceProperties.deviceName << " queue family not suitable \n";
+		LOGI("%s queue family not suitable", deviceProperties.deviceName);
 		return false;
 	}
 
@@ -175,11 +187,11 @@ bool PhysicalDevice::IsDeviceSuatiable(VkPhysicalDevice device) {
 	}
 
 	if (!utils::CheckSupported(mDeviceExtensions, availableExtensionsNames)) {
-		std::cout << deviceProperties.deviceName << " extension not suitable \n";
+		LOGI("%s extension not suitable", deviceProperties.deviceName);
 		return false;
 	}
 
-	std::cout << deviceProperties.deviceName << " suitable \n";
+	LOGI("%s suitable", deviceProperties.deviceName);
 	return true;
 }
 
@@ -211,4 +223,4 @@ PhysicalDevice::QueueFamilyIndices PhysicalDevice::FindQueueFamilies(VkPhysicalD
 
 	return indices;
 }
-}
+}	// namespace framework

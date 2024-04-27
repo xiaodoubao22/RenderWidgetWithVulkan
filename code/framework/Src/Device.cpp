@@ -4,8 +4,9 @@
 #include <set>
 
 #include "Utils.h"
+#include "SceneDemoDefs.h"
 
-namespace render {
+namespace framework {
 void Device::Init(PhysicalDevice* physicalDevice) {
 	if (physicalDevice == nullptr && !physicalDevice->IsValid()) {
 		throw std::runtime_error("can not init graphics device with a null or invalid physicalDevice!");
@@ -250,25 +251,25 @@ void Device::CreateLogicalDevice() {
 		queueCreateInfos.push_back(queueCreateInfo);
 	}
 
-	// ------ fill device features -------
-	VkPhysicalDeviceFeatures deviceFeatures{};
-	//deviceFeatures.samplerAnisotropy = VK_TRUE;	// 各向异性滤波，暂时不用
+	std::vector<const char*> deviceLayers = {};
+	if (GetConfig().layer.enableValidationLayer) {
+		deviceLayers.insert(deviceLayers.end(), consts::validationLayers.begin(), consts::validationLayers.end());
+	}
+	std::vector<const char*>& otherLayers = GetConfig().layer.deviceLayers;
+	if (!otherLayers.empty()) {
+		deviceLayers.insert(deviceLayers.end(), otherLayers.begin(), otherLayers.end());
+	}
 
 	// ------ create device -------
 	VkDeviceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());	// 两个命令队列
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();								// 两个命令队列
-	createInfo.pEnabledFeatures = &deviceFeatures;
+	createInfo.pEnabledFeatures = &GetConfig().deviceFeatures;
 	createInfo.enabledExtensionCount = mPhysicalDevice->GetDeviceExtensions().size();	// 设备支持的拓展：交换链等
 	createInfo.ppEnabledExtensionNames = mPhysicalDevice->GetDeviceExtensions().data();
-	if (setting::enableValidationLayer) {
-		createInfo.enabledLayerCount = consts::validationLayers.size();
-		createInfo.ppEnabledLayerNames = consts::validationLayers.data();
-	}
-	else {
-		createInfo.enabledLayerCount = 0;
-	}
+	createInfo.enabledLayerCount = deviceLayers.size();
+	createInfo.ppEnabledLayerNames = deviceLayers.size() == 0 ? nullptr : deviceLayers.data();
 	createInfo.pNext = mPhysicalDevice->GetRequestedExtensionFeatureHeadPtr();
 
 	if (vkCreateDevice(mPhysicalDevice->Get(), &createInfo, nullptr, &mDevice) != VK_SUCCESS) {
@@ -297,5 +298,5 @@ void Device::CreateCommandPool() {
 		throw std::runtime_error("failed to create command pool!");
 	}
 }
-}
+}	// namespace framework
 

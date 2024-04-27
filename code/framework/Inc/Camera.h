@@ -5,7 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-namespace render {
+namespace framework {
 class Camera {
 public:
     Camera();
@@ -60,6 +60,6 @@ public:
     glm::mat4 mProjection;
 
 };
-}   // namespace render
+}   // namespace framework
 
 #endif

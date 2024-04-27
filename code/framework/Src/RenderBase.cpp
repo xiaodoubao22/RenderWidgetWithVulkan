@@ -1,5 +1,6 @@
 #include "RenderBase.h"
 
+#include <stdexcept>
 #include <array>
 #include <Log.h>
 
@@ -7,8 +8,9 @@
 #include "DebugUtils.h"
 #include "WindowTemplate.h"
 #include "AppDispatchTable.h"
+#include "SceneDemoDefs.h"
 
-namespace render {
+namespace framework {
 RenderBase::RenderBase(window::WindowTemplate& w) : mWindow(w)
 {
     mPhysicalDevice = new PhysicalDevice();
@@ -23,14 +25,14 @@ RenderBase::~RenderBase() {
 }
 
 void RenderBase::Init() {
-    CheckValidationLayerSupport(setting::enableValidationLayer);
+    CheckValidationLayerSupport(GetConfig().layer.enableValidationLayer);
 
     // instance
     CreateInstance();
-    AppDispatchTable::GetInstance().InitInstance(mInstance);
+    AppInstanceDispatchTable::GetInstance().InitInstance(mInstance);
 
     // debug utils
-    if (setting::enableValidationLayer) {
+    if (GetConfig().layer.enableValidationLayer) {
         DebugUtils::GetInstance().Setup(mInstance);
     }
         
@@ -38,7 +40,6 @@ void RenderBase::Init() {
     mSurface = mWindow.CreateSurface(mInstance);
         
     // physical device
-    mPhysicalDevice->SetDeviceExtensions(FillDeviceExtensions());
     mPhysicalDevice->Init(mInstance, mSurface);
 
     // device
@@ -47,7 +48,7 @@ void RenderBase::Init() {
     }
     RequestPhysicalDeviceFeatures(mPhysicalDevice);
     mDevice->Init(mPhysicalDevice);
-    AppDispatchTable::GetInstance().InitDevice(mDevice->Get());
+    AppDeviceDispatchTable::GetInstance().InitDevice(mInstance, mDevice->Get());
 
     // swapchain
     mSwapchain->Init(mPhysicalDevice, mDevice, mWindow.GetWindowExtent(), mSurface);
@@ -60,7 +61,7 @@ void RenderBase::CleanUp() {
     mPhysicalDevice->CleanUp();
     vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
 
-    if (setting::enableValidationLayer) {
+    if (GetConfig().layer.enableValidationLayer) {
         DebugUtils::GetInstance().Destroy(mInstance);
     }
 
@@ -87,7 +88,7 @@ void RenderBase::CreateInstance() {
     if (mEnableValidationLayer){
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-    auto otherExtensions = FillInstanceExtensions();
+    std::vector<const char*>& otherExtensions = GetConfig().extension.instanceExtensions;
     extensions.insert(extensions.end(), otherExtensions.begin(), otherExtensions.end());
     utils::PrintStringList(extensions, "enable extensions:");
     if (!CheckExtensionSupport(extensions)) {
@@ -97,20 +98,26 @@ void RenderBase::CreateInstance() {
         LOGI("-------- instance extensions are all supported --------");
     }
 
+    // add layers
+    std::vector<const char*> layers = {};
+    if (mEnableValidationLayer) {
+        layers.insert(layers.end(), consts::validationLayers.begin(), consts::validationLayers.end());
+    }
+    std::vector<const char*>& otherlayers = GetConfig().layer.instanceLayers;
+    layers.insert(layers.end(), otherlayers.begin(), otherlayers.end());
+
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
     createInfo.enabledExtensionCount = extensions.size();
-    createInfo.ppEnabledExtensionNames = extensions.data();
-    createInfo.enabledLayerCount = 0;
-    createInfo.ppEnabledLayerNames = nullptr;
+    createInfo.ppEnabledExtensionNames = extensions.size() == 0 ? nullptr : extensions.data();
+    createInfo.enabledLayerCount = layers.size();
+    createInfo.ppEnabledLayerNames = layers.size() == 0 ? nullptr : layers.data();
     createInfo.pNext = nullptr;
 
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
     if (mEnableValidationLayer) {
-        render::DebugUtils::GetInstance().PopulateDebugMessengerCreateInfo(debugCreateInfo);
-        createInfo.enabledLayerCount = consts::validationLayers.size();
-        createInfo.ppEnabledLayerNames = consts::validationLayers.data();
+        framework::DebugUtils::GetInstance().PopulateDebugMessengerCreateInfo(debugCreateInfo);
         createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
     }
 
@@ -169,10 +176,15 @@ bool RenderBase::CheckExtensionSupport(const std::vector<const char*>& target) {
     return utils::CheckSupported(target, supportExtensionNames);
 }
 
-VkFormat RenderBase::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+VkFormat RenderBase::FindSupportedFormat() {
     if (mPhysicalDevice->Get() == VK_NULL_HANDLE) {
         throw std::runtime_error("mPhysicalDevice is null");
     }
+
+    std::vector<VkFormat>& candidates = GetConfig().presentFb.depthFormatCandidates;
+    VkImageTiling tiling = GetConfig().presentFb.tiling;
+    VkFormatFeatureFlags features = GetConfig().presentFb.features;
+
     for (VkFormat format : candidates) {
         VkFormatProperties props;
         vkGetPhysicalDeviceFormatProperties(mPhysicalDevice->Get(), format, &props);
@@ -185,5 +197,5 @@ VkFormat RenderBase::FindSupportedFormat(const std::vector<VkFormat>& candidates
     }
     throw std::runtime_error("failed to find supported format!");
 }
-}
+}   // namespace framework
 

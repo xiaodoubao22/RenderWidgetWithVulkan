@@ -1,6 +1,6 @@
 #include "Thread.h"
 
-namespace render {
+namespace framework {
 Thread::Thread() {
 }
 
@@ -62,4 +62,4 @@ void Thread::ThreadFunction() {
     OnThreadDestroy();
 }
 
-}
+}   // namespace framework
