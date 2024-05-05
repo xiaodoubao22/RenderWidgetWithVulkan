@@ -27,4 +27,8 @@
 
 - 打开Visual Studio编译并运行。
 
+## 运行效果
+
+<img src="./images/pbr_res_1.png" width="600">
+
 
