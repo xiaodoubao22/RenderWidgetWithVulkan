@@ -14,11 +14,15 @@ public:
     DrawScenePbr();
     ~DrawScenePbr();
 
-    void Init(const RenderInitInfo& initInfo) override;
-    void CleanUp() override;
-    std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
-    void OnResize(VkExtent2D newExtent) override;
-    void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) override;
+    virtual void Init(const RenderInitInfo& initInfo) override;
+    virtual void CleanUp() override;
+    virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
+    virtual void OnResize(VkExtent2D newExtent) override;
+
+    virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) override;
+    virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) override;
+
+    virtual void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) override;
 
 private:
     void CreateRenderPasses();

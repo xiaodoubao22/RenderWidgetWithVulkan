@@ -14,7 +14,6 @@
 
 #include "Log.h"
 #include "SceneDemoDefs.h"
-#include "BufferCreator.h"
 
 namespace framework {
 DrawScenePbr::DrawScenePbr()
@@ -168,6 +167,16 @@ void DrawScenePbr::OnResize(VkExtent2D newExtent)
     CreateMainFramebuffer();
 
     UpdateDescriptorSets();
+}
+
+void DrawScenePbr::GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt)
+{
+    return;
+}
+
+void DrawScenePbr::GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt)
+{
+    return;
 }
 
 void DrawScenePbr::ProcessInputEnvent(const InputEventInfo& inputEnventInfo)
@@ -325,11 +334,32 @@ void DrawScenePbr::CleanUpMainFramebuffer()
 void DrawScenePbr::CreateVertexBuffer() {
     VkDeviceSize bufferSize = sizeof(Vertex3D) * mMesh->GetVertexData().size();
 
-    BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
+    // 创建临时缓冲
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    mDevice->CreateBuffer(bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,		// 用途：transfer src
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer, stagingBufferMemory);
 
-    bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mMesh->GetVertexData().data(), bufferSize,
-            mVertexBuffer, mVertexBufferMemory);
+    // 数据拷贝到临时缓冲
+    void* data;
+    vkMapMemory(mDevice->Get(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, mMesh->GetVertexData().data(), (size_t)bufferSize);
+    vkUnmapMemory(mDevice->Get(), stagingBufferMemory);
+
+    // 创建 mVertexBuffer
+    mDevice->CreateBuffer(bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,	// 用途：transfer src + 顶点缓冲
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        mVertexBuffer, mVertexBufferMemory);
+
+    // 复制 stagingBuffer -> mVertexBuffer
+    mDevice->CopyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
+
+    // 清理临时缓冲
+    vkDestroyBuffer(mDevice->Get(), stagingBuffer, nullptr);
+    vkFreeMemory(mDevice->Get(), stagingBufferMemory, nullptr);
 }
 
 void DrawScenePbr::CleanUpVertexBuffer() {
@@ -341,11 +371,32 @@ void DrawScenePbr::CleanUpVertexBuffer() {
 void DrawScenePbr::CreateIndexBuffer() {
     VkDeviceSize bufferSize = sizeof(uint16_t) * mMesh->GetIndexData().size();
 
-    BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
+    // 创建临时缓冲
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    mDevice->CreateBuffer(bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer, stagingBufferMemory);
 
-    bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mMesh->GetIndexData().data(), bufferSize,
+    // 数据拷贝到临时缓冲
+    void* data;
+    vkMapMemory(mDevice->Get(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, mMesh->GetIndexData().data(), (size_t)bufferSize);
+    vkUnmapMemory(mDevice->Get(), stagingBufferMemory);
+
+    // 创建索引缓冲
+    mDevice->CreateBuffer(bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         mIndexBuffer, mIndexBufferMemory);
+
+    // 复制 stagingBuffer -> mIndexBuffer
+    mDevice->CopyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
+
+    // 清理
+    vkDestroyBuffer(mDevice->Get(), stagingBuffer, nullptr);
+    vkFreeMemory(mDevice->Get(), stagingBufferMemory, nullptr);
 }
 
 void DrawScenePbr::CleanUpIndexBuffer() {
@@ -530,13 +581,54 @@ void DrawScenePbr::CreateTextures()
         throw std::runtime_error("failed to load test_texure.jpg!");
     }
 
-    BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
+    // 创建临时缓冲
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    mDevice->CreateBuffer(imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer, stagingBufferMemory);
 
-    VkImageCreateInfo imageInfo = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM);
-    imageInfo.extent = { static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1 };
-    imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    bufferCreator.CreateTextureFromSrcData(imageInfo, pixels, imageSize, mTestTextureImage, mTestTextureImageMemory);
+    // 图像数据拷贝到临时缓冲，并释放pixels
+    void* data;
+    vkMapMemory(mDevice->Get(), stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(mDevice->Get(), stagingBufferMemory);
+    stbi_image_free(pixels);
+
+    // 创建纹理图像
+    VkImageCreateInfo imageInfo = vulkanInitializers::ImageCreateInfo(
+        VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM,
+        { static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1 },
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    mDevice->CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        mTestTextureImage, mTestTextureImageMemory);
+
+    // 转换image格式，undefined -> transferDst
+    ImageMemoryBarrierInfo imageBarrierInfo{};
+    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    imageBarrierInfo.srcAccessMask = 0;
+    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    imageBarrierInfo.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    mDevice->TransitionImageLayout(mTestTextureImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+
+    // 拷贝数据，从buffer到image
+    mDevice->CopyBufferToImage(stagingBuffer, mTestTextureImage, texWidth, texHeight);
+
+    // 转换image格式，transferDst -> shaderReadOnly
+    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    imageBarrierInfo.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    mDevice->TransitionImageLayout(mTestTextureImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+
+    // 清理临时缓冲
+    vkDestroyBuffer(mDevice->Get(), stagingBuffer, nullptr);
+    vkFreeMemory(mDevice->Get(), stagingBufferMemory, nullptr);
 
     // 创建imageView
     VkImageViewCreateInfo viewInfo = vulkanInitializers::ImageViewCreateInfo(mTestTextureImage,

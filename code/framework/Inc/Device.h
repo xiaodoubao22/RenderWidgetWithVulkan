@@ -9,17 +9,16 @@
 
 namespace framework {
 
-class Device {
-public:
-    struct ImageMemoryBarrierInfo {
-        VkImageLayout oldLayout;
-        VkImageLayout newLayout;
-        VkPipelineStageFlags srcStage;
-        VkAccessFlags srcAccessMask;
-        VkPipelineStageFlags dstStage;
-        VkAccessFlags dstAccessMask;
-    };
+struct ImageMemoryBarrierInfo {
+    VkImageLayout oldLayout;
+    VkImageLayout newLayout;
+    VkPipelineStageFlags srcStage;
+    VkAccessFlags srcAccessMask;
+    VkPipelineStageFlags dstStage;
+    VkAccessFlags dstAccessMask;
+};
 
+class Device {
 public:
     Device() {}
     ~Device() {}
@@ -41,26 +40,13 @@ public:
 
     VkQueue GetPresentQueue() { return mPresentQueue; }
 
-    void CreateImage(VkImageCreateInfo* pImageInfo, VkMemoryPropertyFlags properties,
-        VkImage& image, VkDeviceMemory& imageMemory);
-
     VkCommandBuffer CreateCommandBuffer(VkCommandBufferLevel level);
 
     void FreeCommandBuffer(VkCommandBuffer commandBuffer);
 
-    void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-
     VkCommandBuffer BeginSingleTimeCommands();
 
     void EndSingleTimeCommands(VkCommandBuffer commandBuffer);
-
-    void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
-    void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-
-    void TransitionImageLayout(VkImage image, VkImageAspectFlags aspectMask,
-        const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels = 1);
 
     void AddCmdPipelineBarrier(VkCommandBuffer cmdBuffer, VkImage image, VkImageAspectFlags aspectMask,
         const ImageMemoryBarrierInfo& barrierInfo, uint32_t mipLevels = 1);

@@ -1,8 +1,7 @@
 #ifndef __SCENE_DEMO_DEFS__
 #define __SCENE_DEMO_DEFS__
 
-#include "DrawTextureMsaa.h"
-
+#include "DrawScenePbr.h"
 #include "SceneDemoConfig.h"
 
 static framework::SceneDemoConfig g_SceneDemoConfig = {};
@@ -17,7 +16,7 @@ static void FillConfig()
 
     // physical device
     g_SceneDemoConfig.phisicalDevice.defaultDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-
+    
     // layers
     g_SceneDemoConfig.layer.instanceLayers = {};
     g_SceneDemoConfig.layer.deviceLayers = {};
@@ -35,6 +34,7 @@ static void FillConfig()
     };
     g_SceneDemoConfig.extension.deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
         VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
     };
 
@@ -45,14 +45,14 @@ static void FillConfig()
     };
     g_SceneDemoConfig.swapchain.imageCount = 2;
     g_SceneDemoConfig.swapchain.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-
+    
     // present fb
     g_SceneDemoConfig.presentFb.depthFormatCandidates = { VK_FORMAT_D24_UNORM_S8_UINT };
     g_SceneDemoConfig.presentFb.tiling = VK_IMAGE_TILING_OPTIMAL;
     g_SceneDemoConfig.presentFb.features = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
     // dirs
-    g_SceneDemoConfig.directory.dirSpvFiles = "../code/scene_demo/draw_texture_msaa/Spirv/";
+    g_SceneDemoConfig.directory.dirSpvFiles = "../spv_files/";
     g_SceneDemoConfig.directory.dirResource = "../resource/";
 }
 
@@ -66,9 +66,9 @@ static framework::SceneDemoConfig& GetConfig()
     return g_SceneDemoConfig;
 }
 
-static framework::DrawTextureMsaa* CreateSceneRender()
+static framework::DrawScenePbr* CreateSceneRender()
 {
-    return new framework::DrawTextureMsaa;
+    return new framework::DrawScenePbr;
 }
 
 #endif // !__SCENE_DEMO_DEFS__

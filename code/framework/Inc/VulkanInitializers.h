@@ -331,7 +331,7 @@ inline VkSubpassDependency2 SubpassDependency2(uint32_t srcSubpass, uint32_t dst
 }
 
 inline VkImageCreateInfo ImageCreateInfo(VkImageType imageType,
-    VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
+    VkFormat format, VkExtent3D extent = { 0, 0 ,0 }, VkImageUsageFlags usage = 0)
 {
     VkImageCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -352,7 +352,7 @@ inline VkImageCreateInfo ImageCreateInfo(VkImageType imageType,
 }
 
 inline VkImageViewCreateInfo ImageViewCreateInfo(VkImage image, VkImageViewType viewType,
-    VkFormat format, VkImageSubresourceRange subresourceRange)
+    VkFormat format, VkImageSubresourceRange subresourceRange = { 0, 0 ,1, 0, 1 })
 {
     VkImageViewCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -455,6 +455,29 @@ inline VkBufferCreateInfo BufferCreateInfo(VkDeviceSize size,
     info.size = size;
     info.usage = usage;
     info.sharingMode = sharingMode;
+    return info;
+}
+
+inline VkCommandBufferBeginInfo CommandBufferBeginInfo(VkCommandBufferInheritanceInfo* pInheritanceInfo)
+{
+    VkCommandBufferBeginInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    info.flags = 0;
+    info.pInheritanceInfo = pInheritanceInfo;
+    return info;
+}
+
+inline VkRenderPassBeginInfo RenderPassBeginInfo(VkRenderPass renderPass, VkFramebuffer framebuffer)
+{
+    const VkClearValue* pClearValues;
+    VkRenderPassBeginInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    info.renderPass = renderPass;
+    info.framebuffer = framebuffer;
+    info.pNext = nullptr;
+    info.renderArea = {};
+    info.clearValueCount = 0;
+    info.pClearValues = nullptr;
     return info;
 }
 

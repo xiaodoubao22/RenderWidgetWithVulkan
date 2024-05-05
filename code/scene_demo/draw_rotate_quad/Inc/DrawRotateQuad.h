@@ -17,9 +17,6 @@ public:
     virtual void CleanUp() override;
     virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
 
-    virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) override;
-    virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) override;
-
 private:
     void CreateRenderPasses();
     void CleanUpRenderPasses();
@@ -80,7 +77,7 @@ private:
         {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
     };
 
-    const std::vector<uint16_t> mTriangleIndices = {
+    std::vector<uint16_t> mTriangleIndices = {
         0, 1, 2, 2, 3, 0
     };
 };

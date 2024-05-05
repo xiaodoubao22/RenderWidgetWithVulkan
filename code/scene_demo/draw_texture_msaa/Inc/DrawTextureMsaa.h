@@ -12,20 +12,21 @@ public:
     DrawTextureMsaa() {}
     ~DrawTextureMsaa() {}
 
-    virtual void Init(const RenderInitInfo& initInfo) override;
-    virtual void CleanUp() override;
-    virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
-    virtual void OnResize(VkExtent2D newExtent) override;
-
-    virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) override;
-    virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) override;
+    void Init(const RenderInitInfo& initInfo) override;
+    void CleanUp() override;
+    std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
+    void OnResize(VkExtent2D newExtent) override;
 
 private:
 
+    void CreatePipelines();
+    void CleanUpPipelines();
 
 private:
     std::vector<VkCommandBuffer> mPrimaryCommandBuffers = {};
     VkCommandBuffer mCommandBuffer = VK_NULL_HANDLE;
+
+    PipelineObjecs mPipeline = {};
 
 };
 }

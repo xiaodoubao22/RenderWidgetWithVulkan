@@ -44,9 +44,6 @@ public:
     virtual void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) {}
     virtual void OnResize(VkExtent2D newExtent) {}
 
-    virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) {};
-    virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) {};
-
 protected:
     bool InitCheck(const RenderInitInfo& initInfo)
     {

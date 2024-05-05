@@ -195,7 +195,4 @@ void PipelineFactory::RetrieveResource(std::vector<VkPipelineShaderStageCreateIn
     }
     discriptorSetlayouts = {};
 }
-
-
-
 }   // namespace framework

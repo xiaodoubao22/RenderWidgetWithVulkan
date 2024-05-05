@@ -52,7 +52,7 @@ static void FillConfig()
     g_SceneDemoConfig.presentFb.features = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
     // dirs
-    g_SceneDemoConfig.directory.dirSpvFiles = "../spv_files/";
+    g_SceneDemoConfig.directory.dirSpvFiles = "../code/scene_demo/draw_scene_pbr/Spirv/";
     g_SceneDemoConfig.directory.dirResource = "../resource/";
 }
 

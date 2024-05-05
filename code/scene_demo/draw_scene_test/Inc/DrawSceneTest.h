@@ -14,14 +14,10 @@ public:
     DrawSceneTest();
     ~DrawSceneTest();
 
-    virtual void Init(const RenderInitInfo& initInfo) override;
-    virtual void CleanUp() override;
-    virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
-
-    virtual void GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt) override;
-    virtual void GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt) override;
-
-    virtual void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) override;
+    void Init(const RenderInitInfo& initInfo) override;
+    void CleanUp() override;
+    std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
+    void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) override;
 
 private:
     void CreateRenderPasses();

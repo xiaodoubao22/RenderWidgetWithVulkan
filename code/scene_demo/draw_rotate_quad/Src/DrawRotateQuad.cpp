@@ -9,6 +9,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "SceneDemoDefs.h"
+#include "BufferCreator.h"
 
 namespace framework {
 DrawRotateQuad::DrawRotateQuad() {}
@@ -118,16 +119,6 @@ std::vector<VkCommandBuffer>& DrawRotateQuad::RecordCommand(const RenderInputInf
     return mPrimaryCommandBuffers;
 }
 
-void DrawRotateQuad::GetRequiredDeviceExtensions(std::vector<const char*>& deviceExt)
-{
-    return;
-}
-
-void DrawRotateQuad::GetRequiredInstanceExtensions(std::vector<const char*>& deviceExt)
-{
-    return;
-}
-
 void DrawRotateQuad::CreateRenderPasses()
 {
 
@@ -141,32 +132,11 @@ void DrawRotateQuad::CleanUpRenderPasses()
 void DrawRotateQuad::CreateVertexBuffer() {
     VkDeviceSize bufferSize = sizeof(mTriangleVertices[0]) * mTriangleVertices.size();
 
-    // 创建临时缓冲
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    mDevice->CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,		// 用途：transfer src
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer, stagingBufferMemory);
+    BufferCreator& bufferCreator = BufferCreator::GetInstance();
+    bufferCreator.SetDevice(mDevice);
 
-    // 数据拷贝到临时缓冲
-    void* data;
-    vkMapMemory(mDevice->Get(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, mTriangleVertices.data(), (size_t)bufferSize);
-    vkUnmapMemory(mDevice->Get(), stagingBufferMemory);
-
-    // 创建 mVertexBuffer
-    mDevice->CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,	// 用途：transfer src + 顶点缓冲
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mTriangleVertices.data(), bufferSize,
         mVertexBuffer, mVertexBufferMemory);
-
-    // 复制 stagingBuffer -> mVertexBuffer
-    mDevice->CopyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
-
-    // 清理临时缓冲
-    vkDestroyBuffer(mDevice->Get(), stagingBuffer, nullptr);
-    vkFreeMemory(mDevice->Get(), stagingBufferMemory, nullptr);
 }
 
 void DrawRotateQuad::CleanUpVertexBuffer() {
@@ -178,32 +148,11 @@ void DrawRotateQuad::CleanUpVertexBuffer() {
 void DrawRotateQuad::CreateIndexBuffer() {
     VkDeviceSize bufferSize = sizeof(mTriangleIndices[0]) * mTriangleIndices.size();
 
-    // 创建临时缓冲
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    mDevice->CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer, stagingBufferMemory);
+    BufferCreator& bufferCreator = BufferCreator::GetInstance();
+    bufferCreator.SetDevice(mDevice);
 
-    // 数据拷贝到临时缓冲
-    void* data;
-    vkMapMemory(mDevice->Get(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, mTriangleIndices.data(), (size_t)bufferSize);
-    vkUnmapMemory(mDevice->Get(), stagingBufferMemory);
-
-    // 创建索引缓冲
-    mDevice->CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mTriangleIndices.data(), bufferSize,
         mIndexBuffer, mIndexBufferMemory);
-
-    // 复制 stagingBuffer -> mIndexBuffer
-    mDevice->CopyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
-
-    // 清理
-    vkDestroyBuffer(mDevice->Get(), stagingBuffer, nullptr);
-    vkFreeMemory(mDevice->Get(), stagingBufferMemory, nullptr);
 }
 
 void DrawRotateQuad::CleanUpIndexBuffer() {
@@ -214,7 +163,10 @@ void DrawRotateQuad::CleanUpIndexBuffer() {
 void DrawRotateQuad::CreateUniformBuffer() {
     VkDeviceSize bufferSize = sizeof(UboMvpMatrix);
 
-    mDevice->CreateBuffer(bufferSize,
+    BufferCreator& bufferCreator = BufferCreator::GetInstance();
+    bufferCreator.SetDevice(mDevice);
+
+    bufferCreator.CreateBuffer(bufferSize,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         mUniformBuffer, mUniformBuffersMemory);
@@ -283,8 +235,8 @@ void DrawRotateQuad::CreatePipelines()
 
     // create shader
     std::vector<ShaderFileInfo> shaderFilePaths = {
-        { GetConfig().directory.dirSpvFiles + std::string("DrawTriangleTestVert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
-        { GetConfig().directory.dirSpvFiles + std::string("DrawTriangleTestFrag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
+        { GetConfig().directory.dirSpvFiles + std::string("DrawTriangleTest.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
+        { GetConfig().directory.dirSpvFiles + std::string("DrawTriangleTest.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
     // descriptor layout

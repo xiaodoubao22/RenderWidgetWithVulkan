@@ -26,21 +26,21 @@ public:
     void SetFbResized();
 
 private:
-    virtual void OnThreadInit() override;
-    virtual void OnThreadLoop() override;
-    virtual void OnThreadDestroy() override;
+    // override from Thread
+    void OnThreadInit() override;
+    void OnThreadLoop() override;
+    void OnThreadDestroy() override;
 
-    virtual std::vector<const char*> FillDeviceExtensions() override;
-    virtual std::vector<const char*> FillInstanceExtensions() override;
-    virtual void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
+    // override from RenderBase
+    void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
 
 private:
     // ----- rener functions -----
     void Resize();
 
     // ----- create and clean up ----- 
-    void CreateDepthResources();
-    void CleanUpDepthResources();
+    void CreateAttachments();
+    void CleanUpAttachments();
 
     void CreateFramebuffers();
     void CleanUpFramebuffers();
