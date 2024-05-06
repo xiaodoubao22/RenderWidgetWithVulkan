@@ -251,19 +251,30 @@ inline VkFragmentShadingRateAttachmentInfoKHR FragmentShadingRateAttachmentInfoK
 }
 
 inline VkSubpassDescription2 SubpassDescription2(VkPipelineBindPoint pipelineBindPoint,
-    VkAttachmentReference2* pColorAttachment,
-    const VkAttachmentReference2* pDepthStencilAttachment,
-    uint32_t viewMask = 0)
+    const VkAttachmentReference2* pColorAttachment = nullptr,
+    const VkAttachmentReference2* pDepthStencilAttachment = nullptr,
+    const VkAttachmentReference2* pResolveAttachment = nullptr)
 {
     VkSubpassDescription2 info{};
     info.sType = VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2;
     info.pNext = nullptr;
     info.flags = 0;
+
     info.pipelineBindPoint = pipelineBindPoint;
-    info.colorAttachmentCount = 1;
+
+    info.inputAttachmentCount = 0;
+    info.pInputAttachments = nullptr;
+
+    info.colorAttachmentCount = (pColorAttachment == nullptr) ? 0 : 1;
     info.pColorAttachments = pColorAttachment;
+    info.pResolveAttachments = pResolveAttachment;
+
     info.pDepthStencilAttachment = pDepthStencilAttachment;
-    info.viewMask = viewMask;
+
+    info.preserveAttachmentCount = 0;
+    info.pPreserveAttachments = nullptr;
+
+    info.viewMask = 0;
     return info;
 }
 

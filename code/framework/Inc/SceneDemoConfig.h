@@ -42,6 +42,9 @@ struct PresentFbConfig {
     std::vector<VkFormat> depthFormatCandidates = { VK_FORMAT_D24_UNORM_S8_UINT };
     VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    bool enableMsaa = false;
+    VkSampleCountFlagBits msaaSampleCount = VK_SAMPLE_COUNT_1_BIT;
 };
 
 struct DirectoryConfig {

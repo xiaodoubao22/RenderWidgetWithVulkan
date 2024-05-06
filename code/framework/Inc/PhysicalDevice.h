@@ -49,6 +49,8 @@ public:
 
     uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
+    VkSampleCountFlagBits GetMaxUsableSampleCount();
+
     /*
      * @brief Store a extension feature in PhysicalDevice, reference to Vulkan-Samples.
      */

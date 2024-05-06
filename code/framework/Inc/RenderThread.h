@@ -57,11 +57,18 @@ private:
     VkSemaphore mRenderFinishedSemaphore = VK_NULL_HANDLE;
     VkFence mInFlightFence = VK_NULL_HANDLE;
 
-    // swapchain fb resources
+    // present fb depth attahcment
     VkFormat mDepthFormat = VK_FORMAT_UNDEFINED;
     VkImage mDepthImage = VK_NULL_HANDLE;
     VkDeviceMemory mDepthImageMemory = VK_NULL_HANDLE;
     VkImageView mDepthImageView = VK_NULL_HANDLE;
+    
+    // present fb color attahcment (if MSAA enable)
+    VkImage mColorImage = VK_NULL_HANDLE;
+    VkDeviceMemory mColorImageMemory = VK_NULL_HANDLE;
+    VkImageView mColorImageView = VK_NULL_HANDLE;
+
+    // swapchain fb resources
     std::vector<VkFramebuffer> mSwapchainFramebuffers = {};
     VkRenderPass mPresentRenderPass = VK_NULL_HANDLE;
 

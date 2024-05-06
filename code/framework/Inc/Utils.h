@@ -5,44 +5,7 @@
 #include <vulkan/vulkan.h>
 #include <string>
 
-namespace setting {
-// 窗口大小
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 960;
-
-// 验证层
-#ifdef NDEBUG
-const bool enableValidationLayer = false;
-#else
-const bool enableValidationLayer = true;
-#endif
-
-// 独显/核显 优先
-const VkPhysicalDeviceType defaultDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-//const VkPhysicalDeviceType defaultDeviceType = VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
-
-// surface图像格式
-const VkSurfaceFormatKHR swapchainSurfaceFormat = {
-    VK_FORMAT_B8G8R8A8_SRGB,
-    VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT
-};
-
-// swapchain
-const uint32_t swapchainImageCount = 2;
-
-const VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-
-const std::string dirSpvFiles = "../spv_files/";
-
-const std::string dirTexture = "../resource/textures/";
-
-}
-
-
-
 namespace consts {
-
-
 constexpr float FLT_PI = 3.14159265358979323f;
 
 const std::vector<const char*> validationLayers = {

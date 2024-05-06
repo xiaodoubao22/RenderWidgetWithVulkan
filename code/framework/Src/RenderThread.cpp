@@ -197,23 +197,56 @@ void RenderThread::Resize() {
 void RenderThread::CreateAttachments() {
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
     bufferCreator.SetDevice(RenderBase::mDevice);
+
+    // check MSAA config
+    VkSampleCountFlagBits maxUsableSampleCount = mPhysicalDevice->GetMaxUsableSampleCount();
+    if (GetConfig().presentFb.enableMsaa) {
+        if (maxUsableSampleCount <= VK_SAMPLE_COUNT_1_BIT) {
+            GetConfig().presentFb.enableMsaa = false;
+        }
+        GetConfig().presentFb.msaaSampleCount = std::min(maxUsableSampleCount, GetConfig().presentFb.msaaSampleCount);
+    }
+    else {
+        GetConfig().presentFb.msaaSampleCount = VK_SAMPLE_COUNT_1_BIT;
+    }
+
     // depth attahcment
-    // image
     VkImageCreateInfo imageInfo = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, mDepthFormat);
     imageInfo.extent = { mSwapchain->GetExtent().width, mSwapchain->GetExtent().height, 1 };
     imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageInfo.samples = GetConfig().presentFb.msaaSampleCount;
     bufferCreator.CreateImage(&imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDepthImage, mDepthImageMemory);
 
-    // imageView
     VkImageViewCreateInfo viewInfo = vulkanInitializers::ImageViewCreateInfo(mDepthImage, VK_IMAGE_VIEW_TYPE_2D, mDepthFormat);
     viewInfo.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
     if (vkCreateImageView(mDevice->Get(), &viewInfo, nullptr, &mDepthImageView) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture image view!");
     }
+
+    // color attachment (if MSAA enable)
+    if (GetConfig().presentFb.enableMsaa) {
+        VkImageCreateInfo colorImageInfo = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, RenderBase::mSwapchain->GetFormat());
+        colorImageInfo.extent = { mSwapchain->GetExtent().width, mSwapchain->GetExtent().height, 1 };
+        colorImageInfo.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        colorImageInfo.samples = GetConfig().presentFb.msaaSampleCount;
+        bufferCreator.CreateImage(&colorImageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mColorImage, mColorImageMemory);
+
+        VkImageViewCreateInfo colorViewInfo = vulkanInitializers::ImageViewCreateInfo(
+            mColorImage, VK_IMAGE_VIEW_TYPE_2D, RenderBase::mSwapchain->GetFormat());
+        colorViewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+        if (vkCreateImageView(mDevice->Get(), &colorViewInfo, nullptr, &mColorImageView) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture image view!");
+        }
+    }
 }
 
 void RenderThread::CleanUpAttachments() {
-    // 销毁深度缓冲
+    // destroy color attachemnt
+    vkDestroyImageView(mDevice->Get(), mColorImageView, nullptr);
+    vkDestroyImage(mDevice->Get(), mColorImage, nullptr);
+    vkFreeMemory(mDevice->Get(), mColorImageMemory, nullptr);
+
+    // destroy depth attachemnt
     vkDestroyImageView(mDevice->Get(), mDepthImageView, nullptr);
     vkDestroyImage(mDevice->Get(), mDepthImage, nullptr);
     vkFreeMemory(mDevice->Get(), mDepthImageMemory, nullptr);
@@ -224,10 +257,13 @@ void RenderThread::CreateFramebuffers() {
     std::vector<VkImageView> swapChainImageViews = mSwapchain->GetImageViews();
     mSwapchainFramebuffers.resize(swapChainImageViews.size());
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
-            swapChainImageViews[i],
-            mDepthImageView
-        };
+        std::vector<VkImageView> attachments = {};
+        if (GetConfig().presentFb.enableMsaa) {
+            attachments = { mColorImageView, mDepthImageView, swapChainImageViews[i]};
+        }
+        else {
+            attachments = { swapChainImageViews[i], mDepthImageView };
+        }
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -277,32 +313,58 @@ void RenderThread::CreatePresentRenderPass()
         vulkanInitializers::AttachmentReference2(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkAttachmentReference2 depthAttachmentRef =
         vulkanInitializers::AttachmentReference2(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    VkAttachmentReference2 colorAttachmentResolveRef = // only use if MSAA enable
+        vulkanInitializers::AttachmentReference2(2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    std::vector<VkSubpassDescription2> subpasses = {
-        vulkanInitializers::SubpassDescription2(VK_PIPELINE_BIND_POINT_GRAPHICS, &colorAttachmentRef, &depthAttachmentRef),
-    };
+    VkSubpassDescription2 subpass0 = vulkanInitializers::SubpassDescription2(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    subpass0.colorAttachmentCount = 1;
+    subpass0.pColorAttachments = &colorAttachmentRef;
+    subpass0.pDepthStencilAttachment = &depthAttachmentRef;
+    if (GetConfig().presentFb.enableMsaa) {
+        subpass0.pResolveAttachments = &colorAttachmentResolveRef;
+    }
+    std::vector<VkSubpassDescription2> subpasses = { subpass0 };
 
+    // dependency
     std::vector<VkSubpassDependency2> dependencys = { vulkanInitializers::SubpassDependency2(VK_SUBPASS_EXTERNAL, 0) };
     dependencys[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependencys[0].srcAccessMask = 0;
     dependencys[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependencys[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    std::vector<VkAttachmentDescription2> mAttachments2(2);
-    // 颜色附件
-    mAttachments2[0] = vulkanInitializers::AttachmentDescription2(mSwapchain->GetFormat());
-    vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[0],
+    // attachments
+    // - color
+    VkAttachmentDescription2 colorAttachment = vulkanInitializers::AttachmentDescription2(mSwapchain->GetFormat());
+    vulkanInitializers::AttachmentDescription2SetOp(colorAttachment,
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-    vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[0],
+    vulkanInitializers::AttachmentDescription2SetLayout(colorAttachment,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-    // 深度附件
-    mAttachments2[1] = vulkanInitializers::AttachmentDescription2(mDepthFormat);
-    vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[1],
+    if (GetConfig().presentFb.enableMsaa) {
+        colorAttachment.samples = GetConfig().presentFb.msaaSampleCount;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+    // - depth
+    VkAttachmentDescription2 depthAttachment = vulkanInitializers::AttachmentDescription2(mDepthFormat);
+    vulkanInitializers::AttachmentDescription2SetOp(depthAttachment,
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
-    vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[1],
+    vulkanInitializers::AttachmentDescription2SetLayout(depthAttachment,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    if (GetConfig().presentFb.enableMsaa) {
+        depthAttachment.samples = GetConfig().presentFb.msaaSampleCount;
+    }
+    // - resolve attachment (only use if MSAA enable)
+    VkAttachmentDescription2 resolveAttachment = vulkanInitializers::AttachmentDescription2(mSwapchain->GetFormat());
+    vulkanInitializers::AttachmentDescription2SetOp(resolveAttachment,
+        VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE);
+    vulkanInitializers::AttachmentDescription2SetLayout(resolveAttachment,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-    VkRenderPassCreateInfo2 renderPassInfo = vulkanInitializers::RenderPassCreateInfo2(mAttachments2, subpasses);
+    // create!
+    std::vector<VkAttachmentDescription2> mAttachments = { colorAttachment, depthAttachment };
+    if (GetConfig().presentFb.enableMsaa) {
+        mAttachments.emplace_back(resolveAttachment);
+    }
+    VkRenderPassCreateInfo2 renderPassInfo = vulkanInitializers::RenderPassCreateInfo2(mAttachments, subpasses);
     vulkanInitializers::RenderPassCreateInfo2SetArray(renderPassInfo, dependencys);
     if (vkCreateRenderPass2(RenderBase::mDevice->Get(), &renderPassInfo, nullptr, &mPresentRenderPass) != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");

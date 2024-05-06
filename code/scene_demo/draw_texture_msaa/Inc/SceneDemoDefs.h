@@ -51,6 +51,9 @@ static void FillConfig()
     g_SceneDemoConfig.presentFb.tiling = VK_IMAGE_TILING_OPTIMAL;
     g_SceneDemoConfig.presentFb.features = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
+    g_SceneDemoConfig.presentFb.enableMsaa = true;
+    g_SceneDemoConfig.presentFb.msaaSampleCount = VK_SAMPLE_COUNT_4_BIT;
+
     // dirs
     g_SceneDemoConfig.directory.dirSpvFiles = "../code/scene_demo/draw_texture_msaa/Spirv/";
     g_SceneDemoConfig.directory.dirResource = "../resource/";
