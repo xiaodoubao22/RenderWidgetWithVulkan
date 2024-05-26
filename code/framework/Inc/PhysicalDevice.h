@@ -39,6 +39,8 @@ public:
 
     VkPhysicalDevice Get() { return mPhysicalDevice; }
 
+    VkInstance GetInstance() { return mInstance; }
+
     VkSurfaceKHR GetSupportedSurface() { return mSupportedSurface; }
 
     QueueFamilyIndices GetQueueFamilyIndices() { return mQueueFamilyIndices; }

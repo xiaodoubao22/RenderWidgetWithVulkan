@@ -10,4 +10,7 @@ glslc %SHADER_SRC_DIR%\DrawMeshGlossy.frag -o .\Spirv\DrawMeshGlossy.frag.spv
 glslc %SHADER_SRC_DIR%\ScreenQuad.frag -o .\Spirv\ScreenQuad.frag.spv
 glslc %SHADER_SRC_DIR%\ScreenQuad.vert -o .\Spirv\ScreenQuad.vert.spv
 
+glslc %SHADER_SRC_DIR%\pbr_width_texture.frag -o .\Spirv\pbr_width_texture.frag.spv
+glslc %SHADER_SRC_DIR%\pbr_width_texture.vert -o .\Spirv\pbr_width_texture.vert.spv
+
 pause

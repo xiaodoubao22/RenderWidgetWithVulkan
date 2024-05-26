@@ -2,13 +2,17 @@
 
 #include <stdexcept>
 #include <array>
-#include <Log.h>
+
 
 #include "Utils.h"
 #include "DebugUtils.h"
 #include "WindowTemplate.h"
 #include "AppDispatchTable.h"
 #include "SceneDemoDefs.h"
+#include "Log.h"
+
+#undef LOG_TAG
+#define LOG_TAG "RenderBase"
 
 namespace framework {
 RenderBase::RenderBase(window::WindowTemplate& w) : mWindow(w)
@@ -90,7 +94,7 @@ void RenderBase::CreateInstance() {
     }
     std::vector<const char*>& otherExtensions = GetConfig().extension.instanceExtensions;
     extensions.insert(extensions.end(), otherExtensions.begin(), otherExtensions.end());
-    utils::PrintStringList(extensions, "enable extensions:");
+    LOGI_LIST("enable extensions:", extensions);
     if (!CheckExtensionSupport(extensions)) {
         throw std::runtime_error("extension not all supported!");
     }
@@ -145,8 +149,8 @@ void RenderBase::CheckValidationLayerSupport(bool enableValidationLayer) {
     }
 
     // 检查
-    utils::PrintStringList(consts::validationLayers, "validationLayers:");
-    utils::PrintStringList(availableLayerNames, "availableLayers:");
+    LOGI_LIST("validationLayers:", consts::validationLayers);
+    LOGI_LIST("availableLayers:", availableLayerNames);
     if (utils::CheckSupported(consts::validationLayers, availableLayerNames)) {
         LOGI("validation layers are all supported");
         mEnableValidationLayer = true;
@@ -170,7 +174,7 @@ bool RenderBase::CheckExtensionSupport(const std::vector<const char*>& target) {
     for (VkExtensionProperties& extension : extensions) {
         supportExtensionNames.push_back(extension.extensionName);
     }
-    utils::PrintStringList(supportExtensionNames, "support extensions names:");
+    LOGI_LIST("support extensions names:", supportExtensionNames);
 
     // 检查
     return utils::CheckSupported(target, supportExtensionNames);

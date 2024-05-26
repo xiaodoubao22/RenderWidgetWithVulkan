@@ -9,9 +9,10 @@ set(GLM_DIR ${THIRD_PARTY}/glm)
 set(GLFW_DIR ${THIRD_PARTY}/glfw-3.3.8.bin.WIN64)
 set(STB_DIR ${THIRD_PARTY}/stb)
 set(TINY_OBJ_LOADER_DIR ${THIRD_PARTY}/tinyobjloader)
+set(VMA_DIR ${THIRD_PARTY}/VulkanMemoryAllocator)
 find_package(Vulkan REQUIRED)
 # 包含三方库
-include_directories(${GLM_DIR} ${GLFW_DIR}/include ${STB_DIR} ${TINY_OBJ_LOADER_DIR})
+include_directories(${GLM_DIR} ${GLFW_DIR}/include ${STB_DIR} ${TINY_OBJ_LOADER_DIR} ${VMA_DIR})
 
 # [framework]设置头文件路径
 set(FRAMEWORK_INC_DIRS ${CMAKE_SOURCE_DIR}/framework/Inc)

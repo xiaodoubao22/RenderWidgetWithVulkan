@@ -12,9 +12,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "Log.h"
 #include "SceneDemoDefs.h"
 #include "BufferCreator.h"
+#include "Log.h"
+#undef LOG_TAG
+#define LOG_TAG "DrawScenePbr"
+
+#define VMA_IMPLEMENTATION
+#include "vma/vk_mem_alloc.h"
 
 namespace framework {
 DrawScenePbr::DrawScenePbr()
@@ -40,7 +45,11 @@ void DrawScenePbr::Init(const RenderInitInfo& initInfo)
     mMainFbExtent.height *= mResolutionFactor;
 
     mCamera->mTargetDistance = 20.0f;
-    mCamera->mTargetPoint = glm::vec3(0.0, 5.0, 5.0);
+    mCamera->mTargetPoint = glm::vec3(0.0, 0.0, 0.0);
+    mCamera->mSensitiveX *= 5.0;
+    mCamera->mSensitiveY *= 5.0;
+    mCamera->mSensitiveFront *= 5.0;
+
     mMesh->GenerateSphere(1.0f, glm::vec3(0.0), glm::uvec2(64, 64));
 
     CreateRenderPasses();
@@ -122,11 +131,20 @@ std::vector<VkCommandBuffer>& DrawScenePbr::RecordCommand(const RenderInputInfo&
         for (int z = 0; z < zSegMent; z++) {
             uboMaterial.roughness = 0.2f + static_cast<float>(z) / zSegMent;
             uboMaterial.metallic = 0.2f + static_cast<float>(y) / ySegMent;
-            uboMaterial.modelOffset = glm::vec3(0.0, SphereDistance * y, SphereDistance * z);
+            uboMaterial.modelOffset = glm::vec3(0.0, SphereDistance * y - 5.0f, SphereDistance * z - 5.0f);
             vkCmdPushConstants(mCommandBuffer, mPipelineDrawPbr.layout, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UniformMaterial), &uboMaterial);
             vkCmdDrawIndexed(mCommandBuffer, mMesh->GetIndexData().size(), 1, 0, 0, 0);
         }
     }
+
+    // pbr with texture
+    vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelinePbrTexture.pipeline);
+
+    vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        mPipelinePbrTexture.layout,
+        0, 1, &mDescriptorSetPbrTexture,
+        0, nullptr);
+    vkCmdDrawIndexed(mCommandBuffer, mMesh->GetIndexData().size(), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(mCommandBuffer);
 
@@ -354,48 +372,39 @@ void DrawScenePbr::CleanUpIndexBuffer() {
 }
 
 void DrawScenePbr::CreateUniformBuffer() {
-    VkBufferCreateInfo bufferInfo = vulkanInitializers::BufferCreateInfo(sizeof(UboMvpMatrix),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-    if (vkCreateBuffer(mDevice->Get(), &bufferInfo, nullptr, &mUboMvp) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create uMvp buffer");
-    }
 
-    bufferInfo.size = sizeof(UniformMaterial);
-    if (vkCreateBuffer(mDevice->Get(), &bufferInfo, nullptr, &mUboMaterial) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create uMaterial buffer");
-    }
+    BufferCreator& bufferCreator = BufferCreator::GetInstance();
+    bufferCreator.SetDevice(mDevice);
 
-    VkMemoryRequirements memReqMvp{};
-    vkGetBufferMemoryRequirements(mDevice->Get(), mUboMvp, &memReqMvp);
+    std::vector<VkBufferCreateInfo> bufferInfos = {
+        vulkanInitializers::BufferCreateInfo(sizeof(UboMvpMatrix), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+        vulkanInitializers::BufferCreateInfo(sizeof(UniformMaterial), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+        vulkanInitializers::BufferCreateInfo(sizeof(GlobalMatrixVP), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+        vulkanInitializers::BufferCreateInfo(sizeof(InstanceMatrixM), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+    };
+    std::vector<VkBuffer> buffers(bufferInfos.size(), VK_NULL_HANDLE);
+    std::vector<void*> mappedAddress(bufferInfos.size(), nullptr);
+    VkDeviceMemory bufferMemory = VK_NULL_HANDLE;
+    bufferCreator.CreateMappedBuffers(bufferInfos, buffers, mappedAddress, bufferMemory);
 
-    VkMemoryRequirements memReqMaterial{};
-    vkGetBufferMemoryRequirements(mDevice->Get(), mUboMaterial, &memReqMaterial);
+    mUniformBuffersMemory = bufferMemory;
 
-    VkDeviceSize uMvpMemSize =
-        static_cast<VkDeviceSize>(std::ceil(static_cast<double>(memReqMvp.size) / memReqMaterial.alignment)) * memReqMaterial.alignment;
-    VkDeviceSize uMaterialMemSize = memReqMaterial.size;
+    mUboMvp = buffers[0];
+    mUboMaterial = buffers[1];
+    mUboGlobalMatrixVP = buffers[2];
+    mUboInstanceMatrixM = buffers[3];
 
-    // 申请显存
-    VkMemoryAllocateInfo allocInfo = vulkanInitializers::MemoryAllocateInfo();
-    allocInfo.allocationSize = uMvpMemSize + uMaterialMemSize;
-    allocInfo.memoryTypeIndex = mDevice->GetPhysicalDevice()->FindMemoryType(
-        memReqMvp.memoryTypeBits & memReqMaterial.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (vkAllocateMemory(mDevice->Get(), &allocInfo, nullptr, &mUniformBuffersMemory) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate vertex buffer memory!");
-    }
-
-    // 显存绑定到缓冲区
-    vkBindBufferMemory(mDevice->Get(), mUboMvp, mUniformBuffersMemory, 0);
-    vkBindBufferMemory(mDevice->Get(), mUboMaterial, mUniformBuffersMemory, uMvpMemSize);
-
-    vkMapMemory(mDevice->Get(), mUniformBuffersMemory, 0, allocInfo.allocationSize, 0, &mUboMvpMapped);
-    mUboMaterialMapped = static_cast<void*>(static_cast<uint8_t*>(mUboMvpMapped) + uMvpMemSize);
+    mUboMvpMapped = mappedAddress[0];
+    mUboMaterialMapped = mappedAddress[1];
+    mUboGlobalMatrixVPAddr = mappedAddress[2];
+    mUboInstanceMatrixMAddr = mappedAddress[3];
 }
 
 void DrawScenePbr::CleanUpUniformBuffer() {
     vkDestroyBuffer(mDevice->Get(), mUboMvp, nullptr);
     vkDestroyBuffer(mDevice->Get(), mUboMaterial, nullptr);
+    vkDestroyBuffer(mDevice->Get(), mUboGlobalMatrixVP, nullptr);
+    vkDestroyBuffer(mDevice->Get(), mUboInstanceMatrixM, nullptr);
     vkFreeMemory(mDevice->Get(), mUniformBuffersMemory, nullptr);
 }
 
@@ -403,12 +412,13 @@ void DrawScenePbr::CreateDescriptorPool() {
     std::vector<VkDescriptorPoolSize> poolSizes = {};   // 池中各种类型的Descriptor个数
     poolSizes.insert(poolSizes.end(), mPipelinePresent.descriptorSizes.begin(), mPipelinePresent.descriptorSizes.end());
     poolSizes.insert(poolSizes.end(), mPipelineDrawPbr.descriptorSizes.begin(), mPipelineDrawPbr.descriptorSizes.end());
+    poolSizes.insert(poolSizes.end(), mPipelinePbrTexture.descriptorSizes.begin(), mPipelinePbrTexture.descriptorSizes.end());
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = poolSizes.size();
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = 2;   // 池中最大能申请descriptorSet的个数
+    poolInfo.maxSets = 3;   // 池中最大能申请descriptorSet的个数
     poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     if (vkCreateDescriptorPool(mDevice->Get(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
@@ -457,14 +467,48 @@ void DrawScenePbr::CreateDescriptorSets() {
     descriptorWrites[1] = vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbr,
         1, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uboMaterialInfo);
     vkUpdateDescriptorSets(mDevice->Get(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+
+    // mDescriptorSetPbrTexture
+    // 从池中申请descriptor set
+    allocInfo.descriptorSetCount = mPipelinePbrTexture.descriptorSetLayouts.size();
+    allocInfo.pSetLayouts = mPipelinePbrTexture.descriptorSetLayouts.data();
+    if (vkAllocateDescriptorSets(mDevice->Get(), &allocInfo, &mDescriptorSetPbrTexture) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+    // 向descriptor set写入信息
+    VkDescriptorBufferInfo uboVpInfo = { mUboGlobalMatrixVP, 0, sizeof(GlobalMatrixVP) };
+    VkDescriptorBufferInfo uboMInfo = { mUboInstanceMatrixM, 0, sizeof(InstanceMatrixM) };
+    VkDescriptorImageInfo texRoughnessInfo = { mTexureSampler, mRoughnessImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    VkDescriptorImageInfo texMatallicInfo = { mTexureSampler, mMatallicImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    VkDescriptorImageInfo texAlbedoInfo = { mTexureSampler, mAlbedoImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    VkDescriptorImageInfo texNormalInfo = { mTexureSampler, mNormalImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+
+    std::vector<VkWriteDescriptorSet> pbrTextureWrites = {
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
+            0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uboVpInfo),
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
+            1, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uboMInfo),
+
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
+            10, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &texRoughnessInfo),
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
+            11, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &texMatallicInfo),
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
+            12, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &texAlbedoInfo),
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
+            13, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &texNormalInfo),
+    };
+
+    vkUpdateDescriptorSets(mDevice->Get(), pbrTextureWrites.size(), pbrTextureWrites.data(), 0, nullptr);
 }
 
 void DrawScenePbr::CreatePipelines()
 {
-
     PipelineFactory& pipelineFactory = PipelineFactory::GetInstance();
     pipelineFactory.SetDevice(mDevice->Get());
 
+    // draw screen quad
     std::vector<ShaderFileInfo> presentShaderFilePaths = {
         { GetConfig().directory.dirSpvFiles + std::string("ScreenQuad.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT },
         { GetConfig().directory.dirSpvFiles + std::string("ScreenQuad.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
@@ -482,6 +526,7 @@ void DrawScenePbr::CreatePipelines()
 
     mPipelinePresent = pipelineFactory.CreateGraphicsPipeline(presentConfigInfo, presentShaderFilePaths, presentLayoutBindings, nullPushConstantRanges);
 
+    // draw glosy material
     std::vector<ShaderFileInfo> pbrShaderFilePaths = {
         { GetConfig().directory.dirSpvFiles + std::string("DrawMesh.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT},
         { GetConfig().directory.dirSpvFiles + std::string("DrawMeshGlossy.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
@@ -506,6 +551,33 @@ void DrawScenePbr::CreatePipelines()
     pipelinePbrConfigInfo.mDepthStencilState.depthBoundsTestEnable = VK_FALSE;
 
     mPipelineDrawPbr = pipelineFactory.CreateGraphicsPipeline(pipelinePbrConfigInfo, pbrShaderFilePaths, pbrLayoutBindings, pbrPushConstantRanges);
+
+    // draw glosy material with texture
+    std::vector<ShaderFileInfo> pbrTextureShaderFilePaths = {
+        { GetConfig().directory.dirSpvFiles + std::string("pbr_width_texture.vert.spv"), VK_SHADER_STAGE_VERTEX_BIT},
+        { GetConfig().directory.dirSpvFiles + std::string("pbr_width_texture.frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT },
+    };
+
+    std::vector<VkDescriptorSetLayoutBinding> pbrTextureLayoutBindings = {
+        vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
+    };
+
+    GraphicsPipelineConfigInfo pbrTextureConfigInfo{};
+    pbrTextureConfigInfo.SetRenderPass(mMainPass);
+    pbrTextureConfigInfo.SetVertexInputBindings({ Vertex3D::GetBindingDescription() });
+    pbrTextureConfigInfo.SetVertexInputAttributes(Vertex3D::getAttributeDescriptions());
+    pbrTextureConfigInfo.mDepthStencilState.depthTestEnable = VK_TRUE;
+    pbrTextureConfigInfo.mDepthStencilState.depthWriteEnable = VK_TRUE;
+    pbrTextureConfigInfo.mDepthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
+    pbrTextureConfigInfo.mDepthStencilState.depthBoundsTestEnable = VK_FALSE;
+
+    mPipelinePbrTexture = pipelineFactory.CreateGraphicsPipeline(pbrTextureConfigInfo, pbrTextureShaderFilePaths, pbrTextureLayoutBindings, nullPushConstantRanges);
+    
 }
 
 void DrawScenePbr::CleanUpPipelines()
@@ -513,44 +585,96 @@ void DrawScenePbr::CleanUpPipelines()
     PipelineFactory& pipelineFactory = PipelineFactory::GetInstance();
     pipelineFactory.SetDevice(mDevice->Get());
 
+    pipelineFactory.DestroyPipelineObjecst(mPipelinePbrTexture);
     pipelineFactory.DestroyPipelineObjecst(mPipelineDrawPbr);
     pipelineFactory.DestroyPipelineObjecst(mPipelinePresent);
 }
 
 void DrawScenePbr::CreateTextures()
 {
-    // 读取图片
-    int texWidth, texHeight, texChannels;
-    //std::string texturePath("../resource/textures/viking_room.png");
-    std::string texturePath("../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_basecolor.png");
-    stbi_set_flip_vertically_on_load(true);
-    stbi_uc* pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-    if (!pixels) {
-        throw std::runtime_error("failed to load test_texure.jpg!");
-    }
-
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
     bufferCreator.SetDevice(mDevice);
 
-    VkImageCreateInfo imageInfo = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM);
-    imageInfo.extent = { static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1 };
-    imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    bufferCreator.CreateTextureFromSrcData(imageInfo, pixels, imageSize, mTestTextureImage, mTestTextureImageMemory);
+    std::vector<std::string> texturePaths = {
+        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_roughness.png",
+        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_metallic.png",
+        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_basecolor.png",
+        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_normal.png",
+    };
 
-    // 创建imageView
-    VkImageViewCreateInfo viewInfo = vulkanInitializers::ImageViewCreateInfo(mTestTextureImage,
-        VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
-    if (vkCreateImageView(mDevice->Get(), &viewInfo, nullptr, &mTestTextureImageView) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create texture image view!");
+    std::vector<StbImageBuffer> imageBuffers(texturePaths.size());
+
+    // read pictures
+    for (int i = 0; i < texturePaths.size(); i++) {
+        int texWidth, texHeight, texChannels;
+        stbi_set_flip_vertically_on_load(true);
+        stbi_uc* pixels = stbi_load(texturePaths[i].c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        if (pixels) {
+            imageBuffers[i].pixels = pixels;
+            imageBuffers[i].width = texWidth;
+            imageBuffers[i].height = texHeight;
+            imageBuffers[i].channels = texChannels;
+            imageBuffers[i].size = texWidth * texHeight * 4 * sizeof(unsigned char);
+            LOGI("chanels=%d", imageBuffers[i].channels);
+        }
+        else {
+            throw std::runtime_error("failed to load test_texure.jpg!");
+        }
     }
+
+    // init createInfo
+    std::vector<VkImageCreateInfo> imageInfos(imageBuffers.size());
+    for (int i = 0; i < imageInfos.size(); i++) {
+        imageInfos[i] = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM);
+        imageInfos[i].extent = { static_cast<uint32_t>(imageBuffers[i].width), static_cast<uint32_t>(imageBuffers[i].height), 1 };
+        imageInfos[i].usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    }
+
+    // create textures
+    std::vector<VkImage> images = {};
+    VkDeviceMemory imageMemory = VK_NULL_HANDLE;
+    bufferCreator.CreateTexturesFromSrcData(imageInfos, imageBuffers, images, imageMemory);
+
+    // create imageView
+    std::vector<VkImageView> imageViews(images.size(), VK_NULL_HANDLE);
+    for (int i = 0; i < imageViews.size(); i++) {
+        VkImageViewCreateInfo viewInfo = vulkanInitializers::ImageViewCreateInfo(images[i],
+            VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+        if (vkCreateImageView(mDevice->Get(), &viewInfo, nullptr, &imageViews[i]) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture image view!");
+        }
+    }
+
+    for (int i = 0; i < images.size(); i++) {
+        LOGI("image=%d view=%d", images[i], imageViews[i]);
+    }
+    LOGI("Memory %d", imageMemory);
+    
+    // save image
+    mMaterialTextureImageMemory = imageMemory;
+    mRoughnessImage = images[0];
+    mMatallicImage = images[1];
+    mAlbedoImage = images[2];
+    mNormalImage = images[3];
+    mRoughnessImageView = imageViews[0];
+    mMatallicImageView = imageViews[1];
+    mAlbedoImageView = imageViews[2];
+    mNormalImageView = imageViews[3];
 }
 
 void DrawScenePbr::CleanUpTextures()
 {
-    vkDestroyImageView(mDevice->Get(), mTestTextureImageView, nullptr);
-    vkDestroyImage(mDevice->Get(), mTestTextureImage, nullptr);
-    vkFreeMemory(mDevice->Get(), mTestTextureImageMemory, nullptr);
+    vkDestroyImageView(mDevice->Get(), mRoughnessImageView, nullptr);
+    vkDestroyImageView(mDevice->Get(), mMatallicImageView, nullptr);
+    vkDestroyImageView(mDevice->Get(), mAlbedoImageView, nullptr);
+    vkDestroyImageView(mDevice->Get(), mNormalImageView, nullptr);
+
+    vkDestroyImage(mDevice->Get(), mRoughnessImage, nullptr);
+    vkDestroyImage(mDevice->Get(), mMatallicImage, nullptr);
+    vkDestroyImage(mDevice->Get(), mAlbedoImage, nullptr);
+    vkDestroyImage(mDevice->Get(), mNormalImage, nullptr);
+
+    vkFreeMemory(mDevice->Get(), mMaterialTextureImageMemory, nullptr);
 }
 
 void DrawScenePbr::CreateTextureSampler() {
@@ -610,12 +734,24 @@ void DrawScenePbr::UpdataUniformBuffer(float aspectRatio)
     uboMaterial.roughness = 0.7f;
     uboMaterial.metallic = 1.0f;
     memcpy(mUboMaterialMapped, &uboMaterial, sizeof(uboMaterial));
+
+    // -------------
+    GlobalMatrixVP uboVp{};
+    uboVp.view = mCamera->GetView();
+    uboVp.proj = mCamera->GetProjection();
+    uboVp.proj[1][1] *= -1;
+    uboVp.cameraPos = glm::inverse(uboVp.view) * glm::vec4(0.0, 0.0, 0.0, 1.0);
+    memcpy(mUboGlobalMatrixVPAddr, &uboVp, sizeof(uboVp));
+
+    InstanceMatrixM uboM{};
+    uboM.model = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.0f, 0.0f));
+    memcpy(mUboInstanceMatrixMAddr, &uboM, sizeof(uboM));
 }
 
 void DrawScenePbr::UpdateDescriptorSets()
 {
     VkDescriptorImageInfo sampleMainFbColorImageInfo = {
-    mTexureSampler, mMainFbColorImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        mTexureSampler, mMainFbColorImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
     std::vector<VkWriteDescriptorSet> presentDescriptorWrites(1);
     presentDescriptorWrites[0] = vulkanInitializers::WriteDescriptorSet(mDescriptorSetPresent,

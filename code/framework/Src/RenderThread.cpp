@@ -1,14 +1,18 @@
 #include "RenderThread.h"
+#include <iostream>
+#include <stdexcept>
+#include <array>
+
 #include "WindowTemplate.h"
 #include "Utils.h"
 #include "DebugUtils.h"
 #include "VulkanInitializers.h"
-#include "Log.h"
 #include "BufferCreator.h"
+#include "Log.h"
 
-#include <iostream>
-#include <stdexcept>
-#include <array>
+#undef LOG_TAG
+#define LOG_TAG "RenderThread"
+
 
 namespace framework {
 RenderThread::RenderThread(window::WindowTemplate& w) : RenderBase(w)

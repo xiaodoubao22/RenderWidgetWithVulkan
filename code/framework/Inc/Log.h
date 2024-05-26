@@ -3,9 +3,37 @@
 
 #include <stdio.h>
 
-#define LOGD(format, ...) //printf("[D] " format "\n", ##__VA_ARGS__)
-#define LOGI(format, ...) printf("[I] " format "\n", ##__VA_ARGS__)
-#define LOGW(format, ...) printf("[W] " format "\n", ##__VA_ARGS__)
-#define LOGE(format, ...) printf("[E] " format "\n", ##__VA_ARGS__)
+#define LOG_TAG "DefaultTag"
+
+#define LOGD(format, ...) //printf("[D] " LOG_TAG ": " format "\n", ##__VA_ARGS__)
+#define LOGI(format, ...) printf("[I] " LOG_TAG ": " format "\n", ##__VA_ARGS__)
+#define LOGW(format, ...) printf("[W] " LOG_TAG ": " format "\n", ##__VA_ARGS__)
+#define LOGE(format, ...) printf("[E] " LOG_TAG ": " format "\n", ##__VA_ARGS__)
+
+#define LOGD_LIST(head, list)
+
+#define LOGI_LIST(head, list)							\
+printf("[I] " LOG_TAG ": " head "\n");					\
+for (int i = 0; i < list.size(); i++) {					\
+	std::string item(list[i]);							\
+	printf("[I] " LOG_TAG ":   - %s\n", item.c_str());	\
+}														\
+printf("[I] " LOG_TAG ":   - end\n");
+
+#define LOGW_LIST(head, list)							\
+printf("[W] " LOG_TAG ": " head "\n");					\
+for (int i = 0; i < list.size(); i++) {					\
+	std::string item(list[i]);							\
+	printf("[W] " LOG_TAG ":   - %s\n", item.c_str());	\
+}														\
+printf("[W] " LOG_TAG ":   - end\n");
+
+#define LOGE_LIST(head, list)							\
+printf("[E] " LOG_TAG ": " head "\n");					\
+for (int i = 0; i < list.size(); i++) {					\
+	std::string item(list[i]);							\
+	printf("[E] " LOG_TAG ":   - %s\n", item.c_str());	\
+}														\
+printf("[E] " LOG_TAG ":   - end\n");
 
 #endif // __LOG_H__

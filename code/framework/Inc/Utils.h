@@ -51,11 +51,17 @@ constexpr int FRAMEWORK_KEY_X = 88;
 constexpr int FRAMEWORK_KEY_Y = 89;
 constexpr int FRAMEWORK_KEY_Z = 90;
 
+struct StbImageBuffer {
+    unsigned char* pixels = nullptr;
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    VkDeviceSize size = 0;
+};
+
 namespace utils {
 std::vector<const char*> StringToCstr(const std::vector<std::string>& strings);
 std::vector<std::string> CstrToString(const std::vector<const char*>& cstrs);
-void PrintStringList(const std::vector<std::string>& stringList, const std::string& head);
-void PrintStringList(const std::vector<const char*>& stringList, const std::string& head);
 bool CheckSupported(const std::vector<const char*>& componentList, const std::vector<const char*>& availableList);
 std::vector<char> ReadFile(const std::string& filename);
 }

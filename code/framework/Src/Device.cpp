@@ -5,6 +5,11 @@
 
 #include "Utils.h"
 #include "SceneDemoDefs.h"
+#include "Log.h"
+
+#undef LOG_TAG
+#define LOG_TAG "Device"
+
 
 namespace framework {
 void Device::Init(PhysicalDevice* physicalDevice) {

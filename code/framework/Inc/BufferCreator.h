@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 #include "Device.h"
+#include "Utils.h"
 
 namespace framework {
 
@@ -26,6 +27,9 @@ public:
     void CreateImage(VkImageCreateInfo* pImageInfo, VkMemoryPropertyFlags properties,
         VkImage& image, VkDeviceMemory& imageMemory);
 
+    void CreateImages(std::vector<VkImageCreateInfo>& imageInfos, VkMemoryPropertyFlags properties,
+        std::vector<VkImage>& images, VkDeviceMemory& imageMemory);
+
     void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
     void CopyBufferToImage(VkBuffer buffer, VkImage image, VkExtent3D imageExtent);
@@ -38,6 +42,12 @@ public:
 
     void CreateTextureFromSrcData(VkImageCreateInfo imageInfo, void* srcImage, VkDeviceSize imageSize,
         VkImage& image, VkDeviceMemory& imageMemory);
+
+    void CreateTexturesFromSrcData(std::vector<VkImageCreateInfo>& imageInfos, std::vector<StbImageBuffer>& imageDataList,
+        std::vector<VkImage>& images, VkDeviceMemory& imageMemory);
+
+    void CreateMappedBuffers(std::vector<VkBufferCreateInfo>& bufferInfos, std::vector<VkBuffer>& buffers,
+        std::vector<void*>& mappedAddress, VkDeviceMemory& bufferMemory);
 private:
     Device* mDevice = nullptr;
 };

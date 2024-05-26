@@ -4,10 +4,13 @@
 #include <iostream>
 #include <vector>
 
-#include "Log.h"
 #include "Utils.h"
 #include "Swapchain.h"
 #include "SceneDemoDefs.h"
+#include "Log.h"
+
+#undef LOG_TAG
+#define LOG_TAG "PhysicalDevice"
 
 namespace framework {
 PhysicalDevice::PhysicalDevice() {
@@ -161,7 +164,7 @@ void PhysicalDevice::PickPhysicalDevices() {
 	VkPhysicalDeviceProperties deviceProperties;
 	vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProperties);
 	LOGI("device name: %s", deviceProperties.deviceName);
-	utils::PrintStringList(mDeviceExtensions, "enable device extensions:");
+	LOGI_LIST("enable device extensions:", mDeviceExtensions);
 
 	uint32_t extensionCount;
 	vkEnumerateDeviceExtensionProperties(mPhysicalDevice, nullptr, &extensionCount, nullptr);
@@ -171,7 +174,7 @@ void PhysicalDevice::PickPhysicalDevices() {
 	for (VkExtensionProperties& extension : availableExtensions) {
 		availableExtensionsNames.push_back(extension.extensionName);
 	}
-	utils::PrintStringList(availableExtensionsNames, "availiable device extensions:");
+	LOGI_LIST("availiable device extensions:", availableExtensionsNames);
 	LOGI("------------------------------------------------\n");
 }
 

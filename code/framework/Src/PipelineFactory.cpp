@@ -3,6 +3,9 @@
 #include "Utils.h"
 #include "Log.h"
 
+#undef LOG_TAG
+#define LOG_TAG "PipelineFactory"
+
 namespace framework {
 PipelineObjecs PipelineFactory::CreateGraphicsPipeline(const GraphicsPipelineConfigInfo& configInfo,
     std::vector<ShaderInfo>& shaderInfos, std::vector<VkDescriptorSetLayoutBinding>& layoutBindings,
@@ -56,6 +59,7 @@ PipelineObjecs PipelineFactory::CreateGraphicsPipelineCoreLogic(const GraphicsPi
     // discriptor set layout
     pipeline.descriptorSetLayouts = { VK_NULL_HANDLE };
     VkDescriptorSetLayoutCreateInfo layoutInfo = vulkanInitializers::DescriptorSetLayoutCreateInfo(layoutBindings);
+    LOGI("Bindings.size=%d", layoutBindings.size());
     if (vkCreateDescriptorSetLayout(mDevice, &layoutInfo, nullptr, &pipeline.descriptorSetLayouts[0]) != VK_SUCCESS) {
         RetrieveResource(shaderStageInfos, pipeline, pipeline.descriptorSetLayouts);
         return {};

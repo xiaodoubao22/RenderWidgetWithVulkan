@@ -1,9 +1,13 @@
 #include "Utils.h"
-#include "Log.h"
 
 #include <iostream>
 #include <unordered_set>
 #include <fstream>
+
+#include "Log.h"
+
+#undef LOG_TAG
+#define LOG_TAG "utils"
 
 namespace utils {
 std::vector<const char*> StringToCstr(const std::vector<std::string>& strings) {
@@ -23,24 +27,6 @@ std::vector<std::string> CstrToString(const std::vector<const char*>& cstrs) {
 		res.push_back(std::string(cstrs[i]));
 	}
 	return res;
-}
-
-void PrintStringList(const std::vector<std::string>& stringList, const std::string& head) {
-	LOGI("%s", head.c_str());
-	for (int i = 0; i < stringList.size(); i++) {
-		LOGI("  - %s", stringList[i].c_str());
-	}
-	LOGI("  - end");
-	return;
-}
-
-void PrintStringList(const std::vector<const char*>& stringList, const std::string& head) {
-	LOGI("%s", head.c_str());
-	for (int i = 0; i < stringList.size(); i++) {
-		LOGI("  - %s", stringList[i]);
-	}
-	LOGI("  - end");
-	return;
 }
 
 bool CheckSupported(const std::vector<const char*>& componentList, const std::vector<const char*>& availableList) {

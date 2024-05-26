@@ -62,6 +62,7 @@ private:
     // ---- render objects ----
     PipelineObjecs mPipelinePresent = {};
     PipelineObjecs mPipelineDrawPbr = {};
+    PipelineObjecs mPipelinePbrTexture = {};
 
     VkCommandBuffer mCommandBuffer = VK_NULL_HANDLE;
 
@@ -78,16 +79,28 @@ private:
     void* mUboMvpMapped = nullptr;
     VkBuffer mUboMaterial = VK_NULL_HANDLE;
     void* mUboMaterialMapped = nullptr;
+    VkBuffer mUboGlobalMatrixVP = VK_NULL_HANDLE;
+    void* mUboGlobalMatrixVPAddr = nullptr;
+    VkBuffer mUboInstanceMatrixM = VK_NULL_HANDLE;
+    void* mUboInstanceMatrixMAddr = nullptr;
     VkDeviceMemory mUniformBuffersMemory = VK_NULL_HANDLE;
 
     VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetPbr = VK_NULL_HANDLE;
+    VkDescriptorSet mDescriptorSetPbrTexture = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetPresent = VK_NULL_HANDLE;
 
     // test texture
-    VkImage mTestTextureImage = VK_NULL_HANDLE;
-    VkDeviceMemory mTestTextureImageMemory = VK_NULL_HANDLE;
-    VkImageView mTestTextureImageView = VK_NULL_HANDLE;
+    VkDeviceMemory mMaterialTextureImageMemory = VK_NULL_HANDLE;
+    VkImage mRoughnessImage = VK_NULL_HANDLE;
+    VkImageView mRoughnessImageView = VK_NULL_HANDLE;
+    VkImage mMatallicImage = VK_NULL_HANDLE;
+    VkImageView mMatallicImageView = VK_NULL_HANDLE;
+    VkImage mAlbedoImage = VK_NULL_HANDLE;
+    VkImageView mAlbedoImageView = VK_NULL_HANDLE;
+    VkImage mNormalImage = VK_NULL_HANDLE;
+    VkImageView mNormalImageView = VK_NULL_HANDLE;
+
     VkSampler mTexureSampler = VK_NULL_HANDLE;
 
     // main fb resources
@@ -117,6 +130,16 @@ private:
         float metallic;
         alignas(16)glm::vec3 albedo;
         alignas(16)glm::vec3 modelOffset;
+    };
+
+    struct GlobalMatrixVP {
+        glm::mat4 view;
+        glm::mat4 proj;
+        glm::vec3 cameraPos;
+    };
+
+    struct InstanceMatrixM {
+        glm::mat4 model;
     };
 
     TestMesh* mMesh = nullptr;
