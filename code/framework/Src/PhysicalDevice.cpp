@@ -39,6 +39,7 @@ void PhysicalDevice::Init(VkInstance instance, VkSurfaceKHR supportedSurface) {
 }
 
 void PhysicalDevice::CleanUp() {
+	mDeviceProperties = {};
 	mQueueFamilyIndices = {};
 	mInstance = VK_NULL_HANDLE;
 	mSupportedSurface = VK_NULL_HANDLE;
@@ -159,11 +160,12 @@ void PhysicalDevice::PickPhysicalDevices() {
 	}
 	mQueueFamilyIndices = FindQueueFamilies(mPhysicalDevice);	// 保存队列族编号
 
+	vkGetPhysicalDeviceProperties(mPhysicalDevice, &mDeviceProperties);
+
 	// 输出选择结果
 	LOGI("--------------- pick GPU success ---------------");
-	VkPhysicalDeviceProperties deviceProperties;
-	vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProperties);
-	LOGI("device name: %s", deviceProperties.deviceName);
+
+	LOGI("device name: %s", mDeviceProperties.deviceName);
 	LOGI_LIST("enable device extensions:", mDeviceExtensions);
 
 	uint32_t extensionCount;

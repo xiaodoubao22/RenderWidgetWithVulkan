@@ -45,6 +45,8 @@ public:
 
     QueueFamilyIndices GetQueueFamilyIndices() { return mQueueFamilyIndices; }
 
+    VkPhysicalDeviceProperties& GetProperties() { return mDeviceProperties; }
+
     SwapChainSupportdetails QuerySwapChainSupport();
 
     VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
@@ -109,6 +111,9 @@ private:
     // request extension feature
     std::map<VkStructureType, std::shared_ptr<void>> mExtensionsFeatures = {};
     void* mRequestedExtensionFeatureHeadPtr = nullptr;
+
+    VkPhysicalDeviceProperties mDeviceProperties = {};
+
 };
 }   // namespace framework
 

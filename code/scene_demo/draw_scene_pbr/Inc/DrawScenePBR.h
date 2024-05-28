@@ -141,6 +141,9 @@ private:
     struct InstanceMatrixM {
         glm::mat4 model;
     };
+    size_t mInstanceMatrixMAlignment = 0;
+    static constexpr uint32_t INSTANCE_NUM = 5;
+    uint32_t mInstanceMatrixMOffsets[INSTANCE_NUM] = {};
 
     TestMesh* mMesh = nullptr;
     Camera* mCamera = nullptr;

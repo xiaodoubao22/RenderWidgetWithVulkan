@@ -140,11 +140,13 @@ std::vector<VkCommandBuffer>& DrawScenePbr::RecordCommand(const RenderInputInfo&
     // pbr with texture
     vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelinePbrTexture.pipeline);
 
-    vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        mPipelinePbrTexture.layout,
-        0, 1, &mDescriptorSetPbrTexture,
-        0, nullptr);
-    vkCmdDrawIndexed(mCommandBuffer, mMesh->GetIndexData().size(), 1, 0, 0, 0);
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            mPipelinePbrTexture.layout,
+            0, 1, &mDescriptorSetPbrTexture,
+            1, &mInstanceMatrixMOffsets[i]);
+        vkCmdDrawIndexed(mCommandBuffer, mMesh->GetIndexData().size(), 1, 0, 0, 0);
+    }
 
     vkCmdEndRenderPass(mCommandBuffer);
 
@@ -371,16 +373,29 @@ void DrawScenePbr::CleanUpIndexBuffer() {
     vkFreeMemory(mDevice->Get(), mIndexBufferMemory, nullptr);
 }
 
-void DrawScenePbr::CreateUniformBuffer() {
-
+void DrawScenePbr::CreateUniformBuffer()
+{
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
     bufferCreator.SetDevice(mDevice);
+
+    size_t minUboAlignment = mDevice->GetPhysicalDevice()->GetProperties().limits.minUniformBufferOffsetAlignment;
+    LOGI("minUboAlignment=%lld", minUboAlignment);
+
+    mInstanceMatrixMAlignment = sizeof(InstanceMatrixM);
+    if (minUboAlignment > 0) {
+        mInstanceMatrixMAlignment = (mInstanceMatrixMAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);
+    }
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        mInstanceMatrixMOffsets[i] = mInstanceMatrixMAlignment * i;
+    }
+    size_t instanceMatrixMBufferSize = mInstanceMatrixMAlignment * INSTANCE_NUM;
+
 
     std::vector<VkBufferCreateInfo> bufferInfos = {
         vulkanInitializers::BufferCreateInfo(sizeof(UboMvpMatrix), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
         vulkanInitializers::BufferCreateInfo(sizeof(UniformMaterial), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
         vulkanInitializers::BufferCreateInfo(sizeof(GlobalMatrixVP), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
-        vulkanInitializers::BufferCreateInfo(sizeof(InstanceMatrixM), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+        vulkanInitializers::BufferCreateInfo(instanceMatrixMBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     };
     std::vector<VkBuffer> buffers(bufferInfos.size(), VK_NULL_HANDLE);
     std::vector<void*> mappedAddress(bufferInfos.size(), nullptr);
@@ -488,7 +503,7 @@ void DrawScenePbr::CreateDescriptorSets() {
         vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
             0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uboVpInfo),
         vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
-            1, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &uboMInfo),
+            1, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, &uboMInfo),
 
         vulkanInitializers::WriteDescriptorSet(mDescriptorSetPbrTexture,
             10, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &texRoughnessInfo),
@@ -560,7 +575,7 @@ void DrawScenePbr::CreatePipelines()
 
     std::vector<VkDescriptorSetLayoutBinding> pbrTextureLayoutBindings = {
         vulkanInitializers::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT),
-        vulkanInitializers::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT),
+        vulkanInitializers::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT),
         vulkanInitializers::DescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
         vulkanInitializers::DescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
         vulkanInitializers::DescriptorSetLayoutBinding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT),
@@ -743,8 +758,13 @@ void DrawScenePbr::UpdataUniformBuffer(float aspectRatio)
     uboVp.cameraPos = glm::inverse(uboVp.view) * glm::vec4(0.0, 0.0, 0.0, 1.0);
     memcpy(mUboGlobalMatrixVPAddr, &uboVp, sizeof(uboVp));
 
-    InstanceMatrixM uboM{};
-    uboM.model = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.0f, 0.0f));
+    InstanceMatrixM uboM[INSTANCE_NUM] = {};
+    float SphereDistance = 2.5f;
+    float yOffset = SphereDistance * 3;
+    float zOffset = -SphereDistance * 2;
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        uboM[i].model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, yOffset, zOffset + SphereDistance * i));
+    }
     memcpy(mUboInstanceMatrixMAddr, &uboM, sizeof(uboM));
 }
 
