@@ -18,10 +18,11 @@ layout(binding = 12) uniform sampler2D texAlbedo;
 layout(binding = 13) uniform sampler2D texNormal;
 
 // in
-layout(location = 0) in vec2 texCoord;
-layout(location = 1) in vec3 normalDir;
-layout(location = 2) in vec4 pointOnWorld;
-layout(location = 3) in mat3 matTBN;
+layout(location = 0) in VERT_OUT {
+    vec2 texCoord;
+    vec4 pointOnWorld;
+    mat3 matTBN;
+} fragIn;
 
 // out
 layout(location = 0) out vec4 outColor;
@@ -64,20 +65,19 @@ float GeometyGGX(float roughness, float dotNtoV)
 void main()
 {
     // sample texture
-    float sampleRoughness = texture(texRoughness, texCoord).x;
-    float sampleMetallic = texture(texMatallic, texCoord).x;
-    vec3 sampleAlbedo = pow(texture(texAlbedo, texCoord).rgb, vec3(2.2));
-    vec3 sampleNormal = texture(texNormal, texCoord).xyz;
+    float sampleRoughness = texture(texRoughness, fragIn.texCoord).x;
+    float sampleMetallic = texture(texMatallic, fragIn.texCoord).x;
+    vec3 sampleAlbedo = pow(texture(texAlbedo, fragIn.texCoord).rgb, vec3(2.2));
+    vec3 sampleNormal = texture(texNormal, fragIn.texCoord).xyz;
     sampleNormal = normalize(sampleNormal * 2.0 - 1.0);
+    sampleNormal = normalize(fragIn.matTBN * sampleNormal);
 
     vec3 cameraPosOnWorld = globalMatrixVP.cameraPos;
-    vec3 normal = normalize(normalDir);     // 法线插值后不再是单位向量，因此需要处理一下
-    normal = normalize(matTBN * sampleNormal);
-
+    
     vec3 outRadiance = vec3(0);
 
-    vec3 wo = normalize(cameraPosOnWorld - pointOnWorld.xyz);
-    float dotNToWo = max(dot(normal, wo), 0.0);
+    vec3 wo = normalize(cameraPosOnWorld - fragIn.pointOnWorld.xyz);
+    float dotNToWo = max(dot(sampleNormal, wo), 0.0);
 
     vec3 F0 = mix(F0_BASE, sampleAlbedo, sampleMetallic);
 
@@ -87,16 +87,16 @@ void main()
         vec3 lightPose = lightPosList[i];
         vec3 lightPower = lightPowerList[i];
 
-        vec3 wi = normalize(pointOnWorld.xyz - lightPose);
-        float dotNToWi = max(dot(normal, -wi), 0.0);
+        vec3 wi = normalize(fragIn.pointOnWorld.xyz - lightPose);
+        float dotNToWi = max(dot(sampleNormal, -wi), 0.0);
 
         vec3 halfVector = normalize((-wi) + wo);
 
-        float lightDist = distance(lightPose, pointOnWorld.xyz);
+        float lightDist = distance(lightPose, fragIn.pointOnWorld.xyz);
         vec3 lightIrradianceOnSp = lightPower / (4.0 * PI * lightDist * lightDist);
 
         vec3 FTerm = FresnelSchlick(F0, max(dot(halfVector, wo), 0.0));
-        float DTerm = DistributionGGX(sampleRoughness, normal, halfVector);
+        float DTerm = DistributionGGX(sampleRoughness, sampleNormal, halfVector);
         float G1 = GeometyGGX(sampleRoughness, dotNToWi);
 
         vec3 kS = FTerm;
