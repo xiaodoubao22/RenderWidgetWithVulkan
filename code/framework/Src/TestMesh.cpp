@@ -85,7 +85,6 @@ void TestMesh::GenerateSphere(float radius, glm::vec3 center, glm::uvec2 gridNum
 
 			Vertex3D vertex{};
 			vertex.texCoord = { u, 1.0f - v };
-			vertex.texCoord *= 2.0;
 
 			float phy = v * consts::FLT_PI;
 			float theta = u * consts::FLT_PI * 2;
@@ -94,6 +93,7 @@ void TestMesh::GenerateSphere(float radius, glm::vec3 center, glm::uvec2 gridNum
 			vertex.position.z = radius * std::cos(phy);
 
 			vertex.normal = glm::normalize(vertex.position - center);
+			vertex.tangent = glm::vec3(std::cos(theta), std::sin(theta), 0.0f);
 
 			mVertices.emplace_back(vertex);
 		}

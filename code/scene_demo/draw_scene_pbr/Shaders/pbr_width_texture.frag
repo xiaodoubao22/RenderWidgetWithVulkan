@@ -21,6 +21,7 @@ layout(binding = 13) uniform sampler2D texNormal;
 layout(location = 0) in vec2 texCoord;
 layout(location = 1) in vec3 normalDir;
 layout(location = 2) in vec4 pointOnWorld;
+layout(location = 3) in mat3 matTBN;
 
 // out
 layout(location = 0) out vec4 outColor;
@@ -66,9 +67,12 @@ void main()
     float sampleRoughness = texture(texRoughness, texCoord).x;
     float sampleMetallic = texture(texMatallic, texCoord).x;
     vec3 sampleAlbedo = pow(texture(texAlbedo, texCoord).rgb, vec3(2.2));
+    vec3 sampleNormal = texture(texNormal, texCoord).xyz;
+    sampleNormal = normalize(sampleNormal * 2.0 - 1.0);
 
     vec3 cameraPosOnWorld = globalMatrixVP.cameraPos;
     vec3 normal = normalize(normalDir);     // 法线插值后不再是单位向量，因此需要处理一下
+    normal = normalize(matTBN * sampleNormal);
 
     vec3 outRadiance = vec3(0);
 
