@@ -17,7 +17,7 @@ public:
     void Init(const RenderInitInfo& initInfo) override;
     void CleanUp() override;
     std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
-    void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) override;
+    void ProcessInputEvent(const InputEventInfo& inputEventInfo) override;
 
 private:
     void CreateRenderPasses();

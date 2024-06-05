@@ -75,7 +75,7 @@ private:
     SceneRenderBase* mSceneRender = nullptr;
 
     // 交互数据
-    std::mutex mInputEnventMutex;
+    std::mutex mInputEventMutex;
     InputEventInfo mInputInfo = {};
 
     std::atomic<bool> mFramebufferResized = false;

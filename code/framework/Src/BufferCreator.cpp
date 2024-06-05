@@ -7,6 +7,43 @@
 #define LOG_TAG "BufferCreator"
 
 namespace framework {
+BufferCreator& BufferCreator::GetInstance() {
+    static BufferCreator instance;
+    return instance;
+}
+
+void BufferCreator::Init(Device* device)
+{
+    if (mInited) {
+        LOGE("repeated init");
+        return;
+    }
+    if (device == nullptr) {
+        return;
+    }
+
+    VmaAllocatorCreateInfo allocatorCreateInfo = {};
+    allocatorCreateInfo.vulkanApiVersion = GetConfig().instance.apiVersion;
+    allocatorCreateInfo.physicalDevice = device->GetPhysicalDevice()->Get();
+    allocatorCreateInfo.device = device->Get();
+    allocatorCreateInfo.instance = device->GetPhysicalDevice()->GetInstance();
+    vmaCreateAllocator(&allocatorCreateInfo, &mAllocator);
+
+    mDevice = device;
+    mInited = true;
+}
+
+void BufferCreator::CleanUp()
+{
+    if (!mInited) {
+        return;
+    }
+    vmaDestroyAllocator(mAllocator);
+    mAllocator = VK_NULL_HANDLE;
+
+    mDevice = nullptr;
+    mInited = false;
+}
 void BufferCreator::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
     VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
@@ -286,6 +323,79 @@ void BufferCreator::CreateTextureFromSrcData(VkImageCreateInfo imageInfo, void* 
     vkFreeMemory(mDevice->Get(), stagingBufferMemory, nullptr);
 }
 
+void BufferCreator::CreateTextureFromSrcData(VkImageCreateInfo imageInfo, void* srcImage, VkDeviceSize imageSize,
+    VkImage& image, VmaAllocation& imageAllocation)
+{
+    if (mDevice == nullptr) {
+        LOGE("uninitialized");
+    }
+    if (srcImage == nullptr || imageSize == 0) {
+        LOGE("input invalid");
+    }
+
+    // 创建临时缓冲
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VmaAllocation  stagingBufferAllocation = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo stagingBufferInfo = vulkanInitializers::BufferCreateInfo(
+        imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    VmaAllocationCreateInfo stagingBufferAllocInfo = {};
+    stagingBufferAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    vmaCreateBuffer(mAllocator, &stagingBufferInfo, &stagingBufferAllocInfo,
+        &stagingBuffer, &stagingBufferAllocation, nullptr);
+
+    // 图像数据拷贝到临时缓冲
+    void* data;
+    vmaMapMemory(mAllocator, stagingBufferAllocation, &data);
+    memcpy(data, srcImage, static_cast<size_t>(imageSize));
+    vmaUnmapMemory(mAllocator, stagingBufferAllocation);
+
+    // 创建纹理图像
+    imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    VmaAllocationCreateInfo imageAllocInfo = {};
+    imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    vmaCreateImage(mAllocator, &imageInfo, &imageAllocInfo, &image, &imageAllocation, nullptr);
+
+    VkCommandBuffer commandBuffer = mDevice->BeginSingleTimeCommands();
+    {
+        // 转换image格式，undefined -> transferDst
+        ImageMemoryBarrierInfo imageBarrierInfo{};
+        imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        imageBarrierInfo.srcAccessMask = 0;
+        imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        imageBarrierInfo.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        mDevice->AddCmdPipelineBarrier(commandBuffer, image, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+
+        // 拷贝数据，从buffer到image
+        VkBufferImageCopy region{};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = { 0, 0, 0 };
+        region.imageExtent = imageInfo.extent;
+        vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+        // 转换image格式，transferDst -> shaderReadOnly
+        imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        imageBarrierInfo.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        mDevice->AddCmdPipelineBarrier(commandBuffer, image, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    }
+    mDevice->EndSingleTimeCommands(commandBuffer);
+
+    // 清理临时缓冲
+    vmaDestroyBuffer(mAllocator, stagingBuffer, stagingBufferAllocation);
+}
+
 void BufferCreator::CreateTexturesFromSrcData(std::vector<VkImageCreateInfo>& imageInfos, std::vector<StbImageBuffer>& imageDataList,
     std::vector<VkImage>& images, VkDeviceMemory& imageMemory)
 {
@@ -356,6 +466,85 @@ void BufferCreator::CreateTexturesFromSrcData(std::vector<VkImageCreateInfo>& im
     // 清理临时缓冲
     vkDestroyBuffer(mDevice->Get(), stagingBuffer, nullptr);
     vkFreeMemory(mDevice->Get(), stagingBufferMemory, nullptr);
+}
+
+void BufferCreator::CreateTexturesFromSrcData(std::vector<VkImageCreateInfo>& imageInfos, std::vector<StbImageBuffer>& imageDataList,
+    std::vector<VkImage>& images, std::vector<VmaAllocation>& imageAllocation)
+{
+    VkDeviceSize maxImageSize = 0;
+    for (int i = 0; i < imageDataList.size(); i++) {
+        maxImageSize = std::max(maxImageSize, imageDataList[i].size);
+    }
+
+    // 创建临时缓冲
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VmaAllocation  stagingBufferAllocation = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo stagingBufferInfo = vulkanInitializers::BufferCreateInfo(
+        maxImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    VmaAllocationCreateInfo stagingBufferAllocInfo = {};
+    stagingBufferAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    vmaCreateBuffer(mAllocator, &stagingBufferInfo, &stagingBufferAllocInfo,
+        &stagingBuffer, &stagingBufferAllocation, nullptr);
+
+    // create images
+    images = std::vector<VkImage>(imageInfos.size(), VK_NULL_HANDLE);
+    imageAllocation = std::vector<VmaAllocation>(imageInfos.size(), VK_NULL_HANDLE);
+    for (int i = 0; i < imageInfos.size(); i++) {
+        imageInfos[i].usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+        VmaAllocationCreateInfo imageAllocInfo = {};
+        imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        vmaCreateImage(mAllocator, &imageInfos[i], &imageAllocInfo, &images[i], &imageAllocation[i], nullptr);
+    }
+
+    // copy data
+    for (int i = 0; i < imageDataList.size(); i++) {
+        // 图像数据拷贝到临时缓冲
+        void* data;
+        vmaMapMemory(mAllocator, stagingBufferAllocation, &data);
+        memcpy(data, imageDataList[i].pixels, imageDataList[i].size);
+        vmaUnmapMemory(mAllocator, stagingBufferAllocation);
+
+        VkCommandBuffer commandBuffer = mDevice->BeginSingleTimeCommands();
+        {
+            // 转换image格式，undefined -> transferDst
+            ImageMemoryBarrierInfo imageBarrierInfo{};
+            imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            imageBarrierInfo.srcAccessMask = 0;
+            imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            imageBarrierInfo.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            mDevice->AddCmdPipelineBarrier(commandBuffer, images[i], VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+
+            // 拷贝数据，从buffer到image
+            VkBufferImageCopy region{};
+            region.bufferOffset = 0;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.mipLevel = 0;
+            region.imageSubresource.baseArrayLayer = 0;
+            region.imageSubresource.layerCount = 1;
+            region.imageOffset = { 0, 0, 0 };
+            region.imageExtent = imageInfos[i].extent;
+            vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+            // 转换image格式，transferDst -> shaderReadOnly
+            imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            imageBarrierInfo.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            mDevice->AddCmdPipelineBarrier(commandBuffer, images[i], VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+        }
+        mDevice->EndSingleTimeCommands(commandBuffer);
+    }
+
+    // 清理临时缓冲
+    vmaDestroyBuffer(mAllocator, stagingBuffer, stagingBufferAllocation);
 }
 
 void BufferCreator::CreateMappedBuffers(std::vector<VkBufferCreateInfo>& bufferInfos, std::vector<VkBuffer>& buffers,

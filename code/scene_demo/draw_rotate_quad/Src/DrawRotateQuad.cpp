@@ -133,7 +133,6 @@ void DrawRotateQuad::CreateVertexBuffer() {
     VkDeviceSize bufferSize = sizeof(mTriangleVertices[0]) * mTriangleVertices.size();
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mTriangleVertices.data(), bufferSize,
         mVertexBuffer, mVertexBufferMemory);
@@ -149,7 +148,6 @@ void DrawRotateQuad::CreateIndexBuffer() {
     VkDeviceSize bufferSize = sizeof(mTriangleIndices[0]) * mTriangleIndices.size();
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mTriangleIndices.data(), bufferSize,
         mIndexBuffer, mIndexBufferMemory);
@@ -164,7 +162,6 @@ void DrawRotateQuad::CreateUniformBuffer() {
     VkDeviceSize bufferSize = sizeof(UboMvpMatrix);
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBuffer(bufferSize,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,

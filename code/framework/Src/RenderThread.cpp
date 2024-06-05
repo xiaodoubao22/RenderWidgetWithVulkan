@@ -27,6 +27,8 @@ RenderThread::~RenderThread()
 
 void RenderThread::OnThreadInit() {
     RenderBase::Init();
+    BufferCreator::GetInstance().Init(RenderBase::mDevice);
+
     mDepthFormat = RenderBase::FindSupportedFormat();
 
     // create render objects
@@ -56,12 +58,12 @@ void RenderThread::OnThreadLoop() {
     vkResetFences(RenderBase::mDevice->Get(), 1, &mInFlightFence);
 
     // 处理输入事件
-    InputEventInfo inputEnvent{};
+    InputEventInfo inputEvent{};
     {
         std::unique_lock<std::mutex> lock();
-        inputEnvent = mInputInfo;
+        inputEvent = mInputInfo;
     }
-    mSceneRender->ProcessInputEnvent(inputEnvent);
+    mSceneRender->ProcessInputEvent(inputEvent);
 
     // 记录命令
     RenderInputInfo renderInput{};
@@ -115,6 +117,8 @@ void RenderThread::OnThreadDestroy() {
     CleanUpAttachments();
     CleanUpSyncObjects();
 
+    BufferCreator::GetInstance().CleanUp();
+
     // destroy basic objects
     RenderBase::CleanUp();
 }
@@ -130,7 +134,7 @@ void RenderThread::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice)
 void RenderThread::SetMouseButton(int button, int action, int mods)
 {
     {
-        std::unique_lock<std::mutex> lock(mInputEnventMutex);
+        std::unique_lock<std::mutex> lock(mInputEventMutex);
         if (action == GLFW_PRESS) {
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 mInputInfo.leftPressFlag = true;
@@ -160,7 +164,7 @@ void RenderThread::SetMouseButton(int button, int action, int mods)
 void RenderThread::SetCursorPosChanged(double xpos, double ypos)
 {
     {
-        std::unique_lock<std::mutex> lock(mInputEnventMutex);
+        std::unique_lock<std::mutex> lock(mInputEventMutex);
         mInputInfo.cursorX = xpos;
         mInputInfo.cursorY = ypos;
     }
@@ -170,7 +174,7 @@ void RenderThread::SetCursorPosChanged(double xpos, double ypos)
 void RenderThread::SetKeyEvent(int key, int scancode, int action, int mods)
 {
     {
-        std::unique_lock<std::mutex> lock(mInputEnventMutex);
+        std::unique_lock<std::mutex> lock(mInputEventMutex);
         mInputInfo.key = key;
         mInputInfo.keyScancode = scancode;
         mInputInfo.keyAction = action;
@@ -200,7 +204,6 @@ void RenderThread::Resize() {
 
 void RenderThread::CreateAttachments() {
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(RenderBase::mDevice);
 
     // check MSAA config
     VkSampleCountFlagBits maxUsableSampleCount = mPhysicalDevice->GetMaxUsableSampleCount();

@@ -14,6 +14,10 @@ struct WindowConfig {
     uint32_t minHeight = 200;
 };
 
+struct InstanceConfig {
+    uint32_t apiVersion = VK_API_VERSION_1_2;
+};
+
 struct PhisicalDeviceConfig {
     VkPhysicalDeviceType defaultDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 };
@@ -54,6 +58,7 @@ struct DirectoryConfig {
 
 struct SceneDemoConfig {
     WindowConfig window = {};
+    InstanceConfig instance = {};
     PhisicalDeviceConfig phisicalDevice = {};
     LayerConfig layer = {};
     ExtensionConfig extension = {};

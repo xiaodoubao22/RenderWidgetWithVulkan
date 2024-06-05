@@ -146,7 +146,6 @@ void DrawTextureMsaa::CleanUpPipelines()
 void DrawTextureMsaa::CreateBuffers()
 {
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mQuadIndices.data(), mQuadIndices.size() * sizeof(mQuadIndices[0]),
         mIndexBuffer, mIndexBufferMemory);
@@ -176,7 +175,6 @@ void DrawTextureMsaa::CreateTextures()
     }
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     VkImageCreateInfo imageInfo = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM);
     imageInfo.extent = { static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1 };

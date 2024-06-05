@@ -140,20 +140,20 @@ std::vector<VkCommandBuffer>& DrawSceneTest::RecordCommand(const RenderInputInfo
     return mPrimaryCommandBuffers;
 }
 
-void DrawSceneTest::ProcessInputEnvent(const InputEventInfo& inputEnventInfo)
+void DrawSceneTest::ProcessInputEvent(const InputEventInfo& inputEventInfo)
 {
     // mouse inpute
-    glm::vec2 curCursorPose = glm::vec2(inputEnventInfo.cursorX, inputEnventInfo.cursorY);
-    if (inputEnventInfo.leftPressFlag && mLastLeftPress) {
+    glm::vec2 curCursorPose = glm::vec2(inputEventInfo.cursorX, inputEventInfo.cursorY);
+    if (inputEventInfo.leftPressFlag && mLastLeftPress) {
         mCamera->ProcessRotate(curCursorPose - mLastCursorPose);
     }
-    mLastLeftPress = inputEnventInfo.leftPressFlag;
+    mLastLeftPress = inputEventInfo.leftPressFlag;
     mLastCursorPose = curCursorPose;
     
     // key input
-    if (inputEnventInfo.keyAction == FRAMEWORK_KEY_PRESS || inputEnventInfo.keyAction == FRAMEWORK_KEY_RELEASE) {
-        if (mKeyPressStatus.find(inputEnventInfo.key) != mKeyPressStatus.end()) {
-            mKeyPressStatus[inputEnventInfo.key] = static_cast<uint16_t>(inputEnventInfo.keyAction);
+    if (inputEventInfo.keyAction == FRAMEWORK_KEY_PRESS || inputEventInfo.keyAction == FRAMEWORK_KEY_RELEASE) {
+        if (mKeyPressStatus.find(inputEventInfo.key) != mKeyPressStatus.end()) {
+            mKeyPressStatus[inputEventInfo.key] = static_cast<uint16_t>(inputEventInfo.keyAction);
         }
     }
     bool directionKeyPress = false;
@@ -187,7 +187,6 @@ void DrawSceneTest::CreateVertexBuffer() {
     VkDeviceSize bufferSize = sizeof(Vertex3D) * mMesh->GetVertexData().size();
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mMesh->GetVertexData().data(), bufferSize,
         mVertexBuffer, mVertexBufferMemory);
@@ -203,7 +202,6 @@ void DrawSceneTest::CreateIndexBuffer() {
     VkDeviceSize bufferSize = sizeof(uint16_t) * mMesh->GetIndexData().size();
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mMesh->GetIndexData().data(), bufferSize,
         mIndexBuffer, mIndexBufferMemory);
@@ -218,7 +216,6 @@ void DrawSceneTest::CreateUniformBuffer() {
     VkDeviceSize bufferSize = sizeof(UboMvpMatrix);
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBuffer(bufferSize,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -330,7 +327,6 @@ void DrawSceneTest::CreateTextures()
     }
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     VkImageCreateInfo imageInfo = vulkanInitializers::ImageCreateInfo(VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM);
     imageInfo.extent = { static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1 };

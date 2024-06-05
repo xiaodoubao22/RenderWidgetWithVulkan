@@ -18,9 +18,6 @@
 #undef LOG_TAG
 #define LOG_TAG "DrawScenePbr"
 
-#define VMA_IMPLEMENTATION
-#include "vma/vk_mem_alloc.h"
-
 namespace framework {
 DrawScenePbr::DrawScenePbr()
 {
@@ -122,7 +119,7 @@ std::vector<VkCommandBuffer>& DrawScenePbr::RecordCommand(const RenderInputInfo&
         0, nullptr);
 
     UniformMaterial uboMaterial{};
-    uboMaterial.albedo = glm::vec3(1.0, 0.5, 0.0);
+    uboMaterial.albedo = glm::vec3(1.0f, 0.765557f, 0.336057f);
 
     int ySegMent = 5;
     int zSegMent = 5;
@@ -190,20 +187,20 @@ void DrawScenePbr::OnResize(VkExtent2D newExtent)
     UpdateDescriptorSets();
 }
 
-void DrawScenePbr::ProcessInputEnvent(const InputEventInfo& inputEnventInfo)
+void DrawScenePbr::ProcessInputEvent(const InputEventInfo& inputEventInfo)
 {
     // mouse inpute
-    glm::vec2 curCursorPose = glm::vec2(inputEnventInfo.cursorX, inputEnventInfo.cursorY);
-    if (inputEnventInfo.leftPressFlag && mLastLeftPress) {
+    glm::vec2 curCursorPose = glm::vec2(inputEventInfo.cursorX, inputEventInfo.cursorY);
+    if (inputEventInfo.leftPressFlag && mLastLeftPress) {
         mCamera->ProcessRotate(curCursorPose - mLastCursorPose);
     }
-    mLastLeftPress = inputEnventInfo.leftPressFlag;
+    mLastLeftPress = inputEventInfo.leftPressFlag;
     mLastCursorPose = curCursorPose;
 
     // key input
-    if (inputEnventInfo.keyAction == FRAMEWORK_KEY_PRESS || inputEnventInfo.keyAction == FRAMEWORK_KEY_RELEASE) {
-        if (mKeyPressStatus.find(inputEnventInfo.key) != mKeyPressStatus.end()) {
-            mKeyPressStatus[inputEnventInfo.key] = static_cast<uint16_t>(inputEnventInfo.keyAction);
+    if (inputEventInfo.keyAction == FRAMEWORK_KEY_PRESS || inputEventInfo.keyAction == FRAMEWORK_KEY_RELEASE) {
+        if (mKeyPressStatus.find(inputEventInfo.key) != mKeyPressStatus.end()) {
+            mKeyPressStatus[inputEventInfo.key] = static_cast<uint16_t>(inputEventInfo.keyAction);
         }
     }
     bool directionKeyPress = false;
@@ -346,7 +343,6 @@ void DrawScenePbr::CreateVertexBuffer() {
     VkDeviceSize bufferSize = sizeof(Vertex3D) * mMesh->GetVertexData().size();
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mMesh->GetVertexData().data(), bufferSize,
             mVertexBuffer, mVertexBufferMemory);
@@ -362,7 +358,6 @@ void DrawScenePbr::CreateIndexBuffer() {
     VkDeviceSize bufferSize = sizeof(uint16_t) * mMesh->GetIndexData().size();
 
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     bufferCreator.CreateBufferFromSrcData(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mMesh->GetIndexData().data(), bufferSize,
         mIndexBuffer, mIndexBufferMemory);
@@ -376,7 +371,6 @@ void DrawScenePbr::CleanUpIndexBuffer() {
 void DrawScenePbr::CreateUniformBuffer()
 {
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     size_t minUboAlignment = mDevice->GetPhysicalDevice()->GetProperties().limits.minUniformBufferOffsetAlignment;
     LOGI("minUboAlignment=%lld", minUboAlignment);
@@ -608,7 +602,6 @@ void DrawScenePbr::CleanUpPipelines()
 void DrawScenePbr::CreateTextures()
 {
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
-    bufferCreator.SetDevice(mDevice);
 
     std::vector<std::string> texturePaths = {
         "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_roughness.png",
@@ -645,10 +638,9 @@ void DrawScenePbr::CreateTextures()
         imageInfos[i].usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
-    // create textures
     std::vector<VkImage> images = {};
-    VkDeviceMemory imageMemory = VK_NULL_HANDLE;
-    bufferCreator.CreateTexturesFromSrcData(imageInfos, imageBuffers, images, imageMemory);
+    std::vector<VmaAllocation> allocations = {};
+    bufferCreator.CreateTexturesFromSrcData(imageInfos, imageBuffers, images, allocations);
 
     // create imageView
     std::vector<VkImageView> imageViews(images.size(), VK_NULL_HANDLE);
@@ -663,18 +655,22 @@ void DrawScenePbr::CreateTextures()
     for (int i = 0; i < images.size(); i++) {
         LOGI("image=%d view=%d", images[i], imageViews[i]);
     }
-    LOGI("Memory %d", imageMemory);
     
     // save image
-    mMaterialTextureImageMemory = imageMemory;
     mRoughnessImage = images[0];
     mMatallicImage = images[1];
     mAlbedoImage = images[2];
     mNormalImage = images[3];
+
     mRoughnessImageView = imageViews[0];
     mMatallicImageView = imageViews[1];
     mAlbedoImageView = imageViews[2];
     mNormalImageView = imageViews[3];
+
+    RoughnessImageAllocation = allocations[0];
+    mMatallicImageAllocation = allocations[1];
+    mAlbedoImageAllocation = allocations[2];
+    mNormalImageAllocation = allocations[3];
 }
 
 void DrawScenePbr::CleanUpTextures()
@@ -684,12 +680,10 @@ void DrawScenePbr::CleanUpTextures()
     vkDestroyImageView(mDevice->Get(), mAlbedoImageView, nullptr);
     vkDestroyImageView(mDevice->Get(), mNormalImageView, nullptr);
 
-    vkDestroyImage(mDevice->Get(), mRoughnessImage, nullptr);
-    vkDestroyImage(mDevice->Get(), mMatallicImage, nullptr);
-    vkDestroyImage(mDevice->Get(), mAlbedoImage, nullptr);
-    vkDestroyImage(mDevice->Get(), mNormalImage, nullptr);
-
-    vkFreeMemory(mDevice->Get(), mMaterialTextureImageMemory, nullptr);
+    vmaDestroyImage(BufferCreator::GetInstance().GetAllocator(), mRoughnessImage, RoughnessImageAllocation);
+    vmaDestroyImage(BufferCreator::GetInstance().GetAllocator(), mMatallicImage, mMatallicImageAllocation);
+    vmaDestroyImage(BufferCreator::GetInstance().GetAllocator(), mAlbedoImage, mAlbedoImageAllocation);
+    vmaDestroyImage(BufferCreator::GetInstance().GetAllocator(), mNormalImage, mNormalImageAllocation);
 }
 
 void DrawScenePbr::CreateTextureSampler() {

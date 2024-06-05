@@ -7,6 +7,7 @@
 #include "FrameworkHeaders.h"
 #include "TestMesh.h"
 #include "Camera.h"
+#include "VmaUsage.h"
 
 namespace framework {
 class DrawScenePbr : public SceneRenderBase {
@@ -18,7 +19,7 @@ public:
     void CleanUp() override;
     std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
     void OnResize(VkExtent2D newExtent) override;
-    void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) override;
+    void ProcessInputEvent(const InputEventInfo& inputEventInfo) override;
 
 private:
     void CreateRenderPasses();
@@ -91,13 +92,16 @@ private:
     VkDescriptorSet mDescriptorSetPresent = VK_NULL_HANDLE;
 
     // test texture
-    VkDeviceMemory mMaterialTextureImageMemory = VK_NULL_HANDLE;
+    VmaAllocation RoughnessImageAllocation = VK_NULL_HANDLE;
     VkImage mRoughnessImage = VK_NULL_HANDLE;
     VkImageView mRoughnessImageView = VK_NULL_HANDLE;
+    VmaAllocation mMatallicImageAllocation = VK_NULL_HANDLE;
     VkImage mMatallicImage = VK_NULL_HANDLE;
     VkImageView mMatallicImageView = VK_NULL_HANDLE;
+    VmaAllocation mAlbedoImageAllocation = VK_NULL_HANDLE;
     VkImage mAlbedoImage = VK_NULL_HANDLE;
     VkImageView mAlbedoImageView = VK_NULL_HANDLE;
+    VmaAllocation mNormalImageAllocation = VK_NULL_HANDLE;
     VkImage mNormalImage = VK_NULL_HANDLE;
     VkImageView mNormalImageView = VK_NULL_HANDLE;
 

@@ -41,7 +41,7 @@ public:
     virtual void Init(const RenderInitInfo& initInfo) = 0;
     virtual void CleanUp() = 0;
     virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) = 0;
-    virtual void ProcessInputEnvent(const InputEventInfo& inputEnventInfo) {}
+    virtual void ProcessInputEvent(const InputEventInfo& inputEventInfo) {}
     virtual void OnResize(VkExtent2D newExtent) {}
 
 protected:
