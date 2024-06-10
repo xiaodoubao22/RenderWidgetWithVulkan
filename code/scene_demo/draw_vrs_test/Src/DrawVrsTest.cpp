@@ -215,8 +215,12 @@ void DrawVrsTest::OnResize(VkExtent2D newExtent)
     mMainFbExtent.width *= mResolutionFactor;
     mMainFbExtent.height *= mResolutionFactor;
 
+    mVrsPipeline->CleanUpVrsImage();
+
     CleanUpMainFramebuffer();
     CreateMainFramebuffer();
+
+    mVrsPipeline->CreateVrsImage(mMainFbExtent.width, mMainFbExtent.height);
 
     UpdateDescriptorSets();
 }
@@ -884,6 +888,7 @@ void DrawVrsTest::UpdataUniformBuffer(float aspectRatio)
 
 void DrawVrsTest::UpdateDescriptorSets()
 {
+    // present pass
     VkDescriptorImageInfo sampleMainFbColorImageInfo = {
         mTexureSampler, mMainFbColorImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
@@ -891,6 +896,27 @@ void DrawVrsTest::UpdateDescriptorSets()
     presentDescriptorWrites[0] = vulkanInitializers::WriteDescriptorSet(mDescriptorSetPresent,
         0, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &sampleMainFbColorImageInfo);
     vkUpdateDescriptorSets(mDevice->Get(), presentDescriptorWrites.size(), presentDescriptorWrites.data(), 0, nullptr);
+
+    // compute vrs pass
+    VkDescriptorImageInfo texInputImageInfo = { mTexureSampler, mMainFbColorImageView, VK_IMAGE_LAYOUT_GENERAL };
+    VkDescriptorImageInfo texVrsImageInfo = { mTexureSampler, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_GENERAL };
+    std::vector<VkWriteDescriptorSet> vrsDescriptorSetWrites = {
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetVrsComp,
+            0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &texInputImageInfo),
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetVrsComp,
+            1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &texVrsImageInfo),
+    };
+    vkUpdateDescriptorSets(mDevice->Get(), vrsDescriptorSetWrites.size(), vrsDescriptorSetWrites.data(), 0, nullptr);
+
+    // blend vrs pass
+    VkDescriptorImageInfo sampleVrsBlendImageInfo = {
+        mTexureSamplerNearst, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+    std::vector<VkWriteDescriptorSet> vrsBlendDescriptorWrites = {
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetBlendVrs,
+            0, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &sampleVrsBlendImageInfo),
+    };
+    vkUpdateDescriptorSets(mDevice->Get(), vrsBlendDescriptorWrites.size(), vrsBlendDescriptorWrites.data(), 0, nullptr);
 }
 
 void DrawVrsTest::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input)
