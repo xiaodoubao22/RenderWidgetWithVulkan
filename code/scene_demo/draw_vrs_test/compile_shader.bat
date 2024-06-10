@@ -17,6 +17,8 @@ glslc %SHADER_SRC_DIR%\pbr_width_texture.vert -o .\Spirv\pbr_width_texture.vert.
 glslc %SHADER_SRC_DIR%\draw_vrs_region.frag -o .\Spirv\draw_vrs_region.frag.spv
 glslc %SHADER_SRC_DIR%\draw_vrs_region.vert -o .\Spirv\draw_vrs_region.vert.spv
 
+glslc %SHADER_SRC_DIR%\draw_vrs_region.comp -o .\Spirv\draw_vrs_region.comp.spv
+
 glslc %SHADER_SRC_DIR%\blend_vrs_image.frag -o .\Spirv\blend_vrs_image.frag.spv
 
 pause

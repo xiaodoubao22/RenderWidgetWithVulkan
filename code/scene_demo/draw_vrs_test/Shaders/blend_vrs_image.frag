@@ -27,13 +27,13 @@ void main() {
     } else if (shadingRate == shadingRate1x2) {
         color = vec3(0.0, 0.0, 1.0);
     } else if (shadingRate == shadingRate2x1) {
-        color = vec3(0.0, 0.0, 0.9);
+        color = vec3(0.0, 0.0, 0.7);
     } else if (shadingRate == shadingRate2x2) {
         color = vec3(0.0, 1.0, 0.0);
     } else if (shadingRate == shadingRate2x4) {
         color = vec3(1.0, 1.0, 0.0);
     } else if (shadingRate == shadingRate4x2) {
-        color = vec3(1.0, 0.9, 0.0);
+        color = vec3(1.0, 0.7, 0.0);
     } else if (shadingRate == shadingRate4x4) {
         color = vec3(1.0, 0.0, 0.0);
     }

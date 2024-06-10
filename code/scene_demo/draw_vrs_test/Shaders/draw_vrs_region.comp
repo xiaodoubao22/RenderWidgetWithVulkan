@@ -8,7 +8,7 @@ layout (binding = 1, r8ui) uniform writeonly uimage2D outputImage;
 
 shared highp uint groupAvgDxDy[4];
 
-const float g_sensitivity = 0.01;
+const float g_sensitivity = 0.003;
 const float g_quarterCoef = 2.13;
 
 uint GetTileIndex()
@@ -98,8 +98,8 @@ void main()
 
     ivec2 tileCoord[4];
     tileCoord[0] = ivec2(gl_WorkGroupID.xy * 2);
-    tileCoord[1] = tileCoord[0] + ivec2(0, 1);
-    tileCoord[2] = tileCoord[0] + ivec2(1, 0);
+    tileCoord[1] = tileCoord[0] + ivec2(1, 0);
+    tileCoord[2] = tileCoord[0] + ivec2(0, 1);
     tileCoord[3] = tileCoord[0] + ivec2(1, 1);
 
     uint rateX = 0x00;
