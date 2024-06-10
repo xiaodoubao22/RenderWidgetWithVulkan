@@ -46,18 +46,17 @@ public:
 
     void CreateTextureFromSrcData(VkImageCreateInfo imageInfo, void* srcImage, VkDeviceSize imageSize,
         VkImage& image, VkDeviceMemory& imageMemory);
-
     void CreateTextureFromSrcData(VkImageCreateInfo imageInfo, void* srcImage, VkDeviceSize imageSize,
         VkImage& image, VmaAllocation& imageAllocation);
 
     void CreateTexturesFromSrcData(std::vector<VkImageCreateInfo>& imageInfos, std::vector<StbImageBuffer>& imageDataList,
         std::vector<VkImage>& images, VkDeviceMemory& imageMemory);
-
     void CreateTexturesFromSrcData(std::vector<VkImageCreateInfo>& imageInfos, std::vector<StbImageBuffer>& imageDataList,
         std::vector<VkImage>& images, std::vector<VmaAllocation>& imageAllocation);
 
     void CreateMappedBuffers(std::vector<VkBufferCreateInfo>& bufferInfos, std::vector<VkBuffer>& buffers,
         std::vector<void*>& mappedAddress, VkDeviceMemory& bufferMemory);
+
 private:
     Device* mDevice = nullptr;
     VmaAllocator mAllocator = VK_NULL_HANDLE;

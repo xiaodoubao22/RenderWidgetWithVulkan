@@ -49,6 +49,9 @@ public:
         std::vector<ShaderFileInfo>& shaderFileInfos, std::vector<VkDescriptorSetLayoutBinding>& layoutBindings,
         std::vector<VkPushConstantRange>& pushConstantRanges);
 
+    PipelineObjecs CreateComputePipeline(const ShaderFileInfo& shaderFileInfo, std::vector<VkDescriptorSetLayoutBinding>& layoutBindings,
+        std::vector<VkPushConstantRange>& pushConstantRanges);
+
     void DestroyPipelineObjecst(PipelineObjecs& pipeline);
 
 private:
@@ -58,6 +61,7 @@ private:
         std::vector<VkPushConstantRange>& pushConstantRanges);
     std::vector<VkPipelineShaderStageCreateInfo> CreateShaderStages(const std::vector<ShaderInfo>& shaderInfos);
     std::vector<VkPipelineShaderStageCreateInfo> CreateShaderStages(const std::vector<ShaderFileInfo>& shaderFileInfos);
+    VkPipelineShaderStageCreateInfo CreateShaderStage(const ShaderFileInfo& shaderFileInfo);
     void DestroyShaderStages(std::vector<VkPipelineShaderStageCreateInfo>& shaderStageInfos);
     VkShaderModule CreateShaderModule(const std::vector<char>& code);
     void RetrieveResource(std::vector<VkPipelineShaderStageCreateInfo> shaderStageInfos,

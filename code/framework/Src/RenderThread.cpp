@@ -158,7 +158,6 @@ void RenderThread::SetMouseButton(int button, int action, int mods)
             }
         }
     }
-    LOGD("button %d %d %d", button, action, mods);
 }
 
 void RenderThread::SetCursorPosChanged(double xpos, double ypos)
@@ -168,7 +167,6 @@ void RenderThread::SetCursorPosChanged(double xpos, double ypos)
         mInputInfo.cursorX = xpos;
         mInputInfo.cursorY = ypos;
     }
-    LOGD("pos %f %f", xpos, ypos);
 }
 
 void RenderThread::SetKeyEvent(int key, int scancode, int action, int mods)

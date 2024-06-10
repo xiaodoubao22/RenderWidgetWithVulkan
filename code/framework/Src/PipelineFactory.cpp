@@ -23,6 +23,58 @@ PipelineObjecs PipelineFactory::CreateGraphicsPipeline(const GraphicsPipelineCon
     return CreateGraphicsPipelineCoreLogic(configInfo, shaderInfos, shaderFileInfos, true, layoutBindings, pushConstantRanges);
 }
 
+PipelineObjecs PipelineFactory::CreateComputePipeline(const ShaderFileInfo& shaderFileInfo, std::vector<VkDescriptorSetLayoutBinding>& layoutBindings,
+    std::vector<VkPushConstantRange>& pushConstantRanges)
+{
+    PipelineObjecs pipeline{};
+    if (mDevice == VK_NULL_HANDLE) {
+        LOGE("device == null");
+        return {};
+    }
+
+    // create shader
+    if (shaderFileInfo.stage != VK_SHADER_STAGE_COMPUTE_BIT) {
+        LOGE("check shader type error");
+    }
+    VkPipelineShaderStageCreateInfo shaderStageInfo = CreateShaderStage(shaderFileInfo);
+    if (shaderStageInfo.module == VK_NULL_HANDLE) {
+        LOGE("create shader module failed!");
+        return {};
+    }
+
+    // discriptor set layout
+    pipeline.descriptorSetLayouts = { VK_NULL_HANDLE };
+    VkDescriptorSetLayoutCreateInfo layoutInfo = vulkanInitializers::DescriptorSetLayoutCreateInfo(layoutBindings);
+    if (vkCreateDescriptorSetLayout(mDevice, &layoutInfo, nullptr, &pipeline.descriptorSetLayouts[0]) != VK_SUCCESS) {
+        RetrieveResource({ shaderStageInfo }, pipeline, pipeline.descriptorSetLayouts);
+        return {};
+    }
+
+    // pipeline layout
+    VkPipelineLayoutCreateInfo layoutCreateInfo = vulkanInitializers::PipelineLayoutCreateInfo(
+        pipeline.descriptorSetLayouts, pushConstantRanges);
+    if (vkCreatePipelineLayout(mDevice, &layoutCreateInfo, nullptr, &pipeline.layout) != VK_SUCCESS) {
+        RetrieveResource({ shaderStageInfo }, pipeline, pipeline.descriptorSetLayouts);
+        return {};
+    }
+
+    VkComputePipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = nullptr;
+    pipelineInfo.flags = 0;
+    pipelineInfo.layout = pipeline.layout;
+    pipelineInfo.stage = shaderStageInfo;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = 0;
+    if (vkCreateComputePipelines(mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline.pipeline) != VK_SUCCESS) {
+        LOGE("create shader module failed!");
+    }
+
+    vkDestroyShaderModule(mDevice, shaderStageInfo.module, nullptr);
+
+    return pipeline;
+}
+
 void PipelineFactory::DestroyPipelineObjecst(PipelineObjecs& pipeline)
 {
     vkDestroyPipeline(mDevice, pipeline.pipeline, nullptr);
@@ -59,7 +111,7 @@ PipelineObjecs PipelineFactory::CreateGraphicsPipelineCoreLogic(const GraphicsPi
     // discriptor set layout
     pipeline.descriptorSetLayouts = { VK_NULL_HANDLE };
     VkDescriptorSetLayoutCreateInfo layoutInfo = vulkanInitializers::DescriptorSetLayoutCreateInfo(layoutBindings);
-    LOGI("Bindings.size=%d", layoutBindings.size());
+    LOGD("Bindings.size=%d", layoutBindings.size());
     if (vkCreateDescriptorSetLayout(mDevice, &layoutInfo, nullptr, &pipeline.descriptorSetLayouts[0]) != VK_SUCCESS) {
         RetrieveResource(shaderStageInfos, pipeline, pipeline.descriptorSetLayouts);
         return {};
@@ -158,6 +210,35 @@ std::vector<VkPipelineShaderStageCreateInfo> PipelineFactory::CreateShaderStages
         result.emplace_back(shaderStage);
     }
     return result;
+}
+
+VkPipelineShaderStageCreateInfo PipelineFactory::CreateShaderStage(const ShaderFileInfo& shaderFileInfo)
+{
+    if (shaderFileInfo.filePath.empty()) {
+        return {};
+    }
+    if (mShaderTypeWightList.find(shaderFileInfo.stage) == mShaderTypeWightList.end()) {
+        return {};
+    }
+
+    auto byteCode = utils::ReadFile(shaderFileInfo.filePath);
+    if (byteCode.empty()) {
+        return {};
+    }
+    VkShaderModule shaderModule = CreateShaderModule(byteCode);
+
+    if (shaderModule == VK_NULL_HANDLE) {
+        return {};
+    }
+
+    VkPipelineShaderStageCreateInfo shaderStage{};
+    shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStage.stage = shaderFileInfo.stage;
+    shaderStage.module = shaderModule;
+    shaderStage.pName = "main";
+    shaderStage.pSpecializationInfo = nullptr;
+
+    return shaderStage;
 }
 
 void PipelineFactory::DestroyShaderStages(std::vector<VkPipelineShaderStageCreateInfo>& shaderStageInfos)

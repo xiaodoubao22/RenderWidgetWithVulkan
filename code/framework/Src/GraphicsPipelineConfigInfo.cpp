@@ -86,6 +86,14 @@ bool GraphicsPipelineConfigInfo::SetInputAssemblyState(VkPrimitiveTopology topol
 	return true;
 }
 
+bool GraphicsPipelineConfigInfo::SetBlendStates(std::vector<VkPipelineColorBlendAttachmentState>& blendAttachments)
+{
+	mAttachments = blendAttachments;
+	mColorBlendState.attachmentCount = mAttachments.size();
+	mColorBlendState.pAttachments = mAttachments.empty() ? nullptr : mAttachments.data();
+	return true;
+}
+
 void GraphicsPipelineConfigInfo::FillDefault()
 {
 	mBindings = {};

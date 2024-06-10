@@ -1,0 +1,128 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout (local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+
+layout (binding = 0, rgba8) uniform readonly image2D inputImage;
+layout (binding = 1, r8ui) uniform writeonly uimage2D outputImage;
+
+shared highp uint groupAvgDxDy[4];
+
+const float g_sensitivity = 0.01;
+const float g_quarterCoef = 2.13;
+
+uint GetTileIndex()
+{
+    //   0    |    1
+    //  -------------
+    //   2    |    3
+    uint index = 0;
+    if (gl_LocalInvocationID.x < 4 && gl_LocalInvocationID.y < 2) {
+        index = 0;
+    } else if (gl_LocalInvocationID.x >= 4 && gl_LocalInvocationID.y < 2) {
+        index = 1;
+    } else if (gl_LocalInvocationID.x < 4 && gl_LocalInvocationID.y >= 2) {
+        index = 2;
+    } else {
+        index = 3;
+    }
+    return index;
+}
+
+float GetLuma(in ivec2 texCoord)
+{
+    vec3 color = imageLoad(inputImage, texCoord).rgb;
+    return dot(color * color, vec3(0.299, 0.587, 0.114));
+}
+
+void Synchronization()
+{
+    memoryBarrierShared();
+    barrier();
+}
+
+void main()
+{
+    ivec2 texCoord00 = ivec2(gl_GlobalInvocationID.x * 2, gl_GlobalInvocationID.y * 4);
+    ivec2 texCoord01 = texCoord00 + ivec2(0, 1);
+    ivec2 texCoord10 = texCoord00 + ivec2(1, 0);
+    ivec2 texCoord11 = texCoord00 + ivec2(1, 1);
+    ivec2 texCoord12 = texCoord00 + ivec2(1, 2);
+    ivec2 texCoord20 = texCoord00 + ivec2(2, 0);
+    ivec2 texCoord21 = texCoord00 + ivec2(2, 1);
+    ivec2 texCoord30 = texCoord00 + ivec2(3, 0);
+    ivec2 texCoord31 = texCoord00 + ivec2(3, 1);
+    ivec2 texCoord32 = texCoord00 + ivec2(3, 2);
+    ivec2 texCoord41 = texCoord00 + ivec2(4, 1);
+
+    if (gl_LocalInvocationID.xy == ivec2(0, 0)) {
+        groupAvgDxDy = uint[](0, 0, 0, 0);
+    }
+
+    Synchronization();
+
+    float luma00 = GetLuma(texCoord00);
+    float luma01 = GetLuma(texCoord01);
+    float luma10 = GetLuma(texCoord10);
+    float luma11 = GetLuma(texCoord11);
+    float luma12 = GetLuma(texCoord12);
+    float luma20 = GetLuma(texCoord20);
+    float luma21 = GetLuma(texCoord21);
+    float luma30 = GetLuma(texCoord30);
+    float luma31 = GetLuma(texCoord31);
+    float luma32 = GetLuma(texCoord32);
+    float luma41 = GetLuma(texCoord41);
+
+    vec4 lumaSubstractor = vec4(luma00, luma11, luma20, luma31);
+    vec4 dx = abs(vec4(luma01, luma12, luma21, luma32) - lumaSubstractor);  
+    vec4 dy = abs(vec4(luma10, luma21, luma30, luma41) - lumaSubstractor);
+
+    highp uint sumDx = uint(dot(dx, vec4(255.0, 255.0, 255.0, 255.0)));
+    highp uint sumDy = uint(dot(dy, vec4(255.0, 255.0, 255.0, 255.0)));
+
+    uint TileIndex = GetTileIndex();
+
+    atomicAdd(groupAvgDxDy[TileIndex], (sumDy << 16) | sumDx);
+
+    Synchronization();
+
+    if (gl_LocalInvocationID.xy != ivec2(0, 0) &&
+        gl_LocalInvocationID.xy != ivec2(4, 0) &&
+        gl_LocalInvocationID.xy != ivec2(0, 2) &&
+        gl_LocalInvocationID.xy != ivec2(4, 2)) {
+        return;
+    }
+
+    float avgDx = float(groupAvgDxDy[TileIndex] & 0xFFFF) / 8192.0;
+    float avgDy = float(groupAvgDxDy[TileIndex] >> 16) / 8192.0;
+
+    ivec2 tileCoord[4];
+    tileCoord[0] = ivec2(gl_WorkGroupID.xy * 2);
+    tileCoord[1] = tileCoord[0] + ivec2(0, 1);
+    tileCoord[2] = tileCoord[0] + ivec2(1, 0);
+    tileCoord[3] = tileCoord[0] + ivec2(1, 1);
+
+    uint rateX = 0x00;
+    if (avgDx * g_quarterCoef < g_sensitivity) {
+        rateX = 0x02;
+    } else if (avgDx < g_sensitivity) {
+        rateX = 0x01;
+    }
+
+    uint rateY = 0x00;
+    if (avgDy * g_quarterCoef < g_sensitivity) {
+        rateY = 0x02;
+    } else if (avgDy < g_sensitivity) {
+        rateY = 0x01;
+    }
+
+    lowp uint shadingRate = rateY | (rateX << 2);
+
+    if (rateX == 0x00 && rateY == 0x02) {
+        shadingRate = 0x01;
+    } else if (rateY == 0x00 && rateX == 0x02) {
+        shadingRate = 0x04;
+    }
+
+    imageStore(outputImage, tileCoord[TileIndex], uvec4(shadingRate));
+}

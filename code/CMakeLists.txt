@@ -22,6 +22,14 @@ file(GLOB FRAMEWORK_INC_FILES ./framework/Inc/*.h ./framework/Inc/*.hpp)
 set(FRAMEWORK_SRC_DIRS ${CMAKE_SOURCE_DIR}/framework/Src)
 file(GLOB FRAMEWORK_SRC_FILES ./framework/Src/*.c ./framework/Src/*.cpp)
 
+# [materials]设置头文件路径
+set(MATRERIALS_INC_DIRS ${CMAKE_SOURCE_DIR}/materials/Inc)
+file(GLOB MATRERIALS_INC_FILES ./materials/Inc/*.h ./materials/Inc/*.hpp)
+
+# [materials]设置源文件路径
+set(MATRERIALS_SRC_DIRS ${CMAKE_SOURCE_DIR}/materials/Src)
+file(GLOB MATRERIALS_SRC_FILES ./materials/Src/*.c ./materials/Src/*.cpp)
+
 set(SCENE_DEMO_DIR ${CMAKE_SOURCE_DIR}/scene_demo)
 
 set(PROJ_NAME_LIST
@@ -29,6 +37,7 @@ set(PROJ_NAME_LIST
     draw_scene_test
     draw_scene_pbr
     draw_texture_msaa
+    draw_vrs_test
     )
 
 foreach(PROJ_NAME IN LISTS PROJ_NAME_LIST)
@@ -40,6 +49,8 @@ foreach(PROJ_NAME IN LISTS PROJ_NAME_LIST)
     add_executable(${PROJ_NAME}
         ${FRAMEWORK_INC_FILES}
         ${FRAMEWORK_SRC_FILES}
+        ${MATRERIALS_INC_FILES}
+        ${MATRERIALS_SRC_FILES}
         ${SCENE_DEMO_INC_FILES}
         ${SCENE_DEMO_SRC_FILES}
         )
@@ -64,6 +75,8 @@ file(GLOB ALL_DEMO_FILES
 set(ALL_FILES
     ${FRAMEWORK_INC_FILES}
     ${FRAMEWORK_SRC_FILES}
+    ${MATRERIALS_INC_FILES}
+    ${MATRERIALS_SRC_FILES}
     ${ALL_DEMO_FILES}
     )
 source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${ALL_FILES})

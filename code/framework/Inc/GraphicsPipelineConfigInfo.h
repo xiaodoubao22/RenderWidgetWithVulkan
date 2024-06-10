@@ -23,6 +23,7 @@ public:
     bool SetVertexInputAttributes(std::vector<VkVertexInputAttributeDescription>&& attributes);
     bool SetRasterizationSamples(VkSampleCountFlagBits sampleCount);
     bool SetInputAssemblyState(VkPrimitiveTopology topology, VkBool32 primitiveRestart = VK_FALSE);
+    bool SetBlendStates(std::vector<VkPipelineColorBlendAttachmentState>& blendAttachments);
 
     void SetRenderPass(VkRenderPass pass, uint32_t subpassIndex = 0)
     {
