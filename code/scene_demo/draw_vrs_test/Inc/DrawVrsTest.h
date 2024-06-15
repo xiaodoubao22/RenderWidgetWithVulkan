@@ -124,7 +124,7 @@ private:
 
     const float mResolutionFactor = 0.8;
     VkExtent2D mMainFbExtent = {};
-    const VkFormat mMainFbColorFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+    const VkFormat mMainFbColorFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;  //VK_FORMAT_R8G8B8A8_UNORM;
     const VkFormat mMainFbDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 
     VrsPipeline* mVrsPipeline = nullptr;

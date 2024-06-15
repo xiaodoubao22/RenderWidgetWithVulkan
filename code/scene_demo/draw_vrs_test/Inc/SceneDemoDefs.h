@@ -15,7 +15,7 @@ static void FillConfig()
     g_SceneDemoConfig.window.minHeight = 200;
 
     // physical device
-    g_SceneDemoConfig.phisicalDevice = {};
+    g_SceneDemoConfig.phisicalDevice = { VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU };
     
     // layers
     g_SceneDemoConfig.layer.instanceLayers = {};

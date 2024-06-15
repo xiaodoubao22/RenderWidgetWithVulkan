@@ -72,6 +72,13 @@ PipelineObjecs PipelineFactory::CreateComputePipeline(const ShaderFileInfo& shad
 
     vkDestroyShaderModule(mDevice, shaderStageInfo.module, nullptr);
 
+    // save data
+    pipeline.descriptorSizes.clear();
+    for (int i = 0; i < layoutBindings.size(); i++) {
+        VkDescriptorPoolSize size = { layoutBindings[i].descriptorType, layoutBindings[i].descriptorCount };
+        pipeline.descriptorSizes.emplace_back(size);
+    }
+
     return pipeline;
 }
 
