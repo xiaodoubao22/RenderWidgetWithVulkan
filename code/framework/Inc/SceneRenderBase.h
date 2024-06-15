@@ -43,6 +43,7 @@ public:
     virtual std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) = 0;
     virtual void ProcessInputEvent(const InputEventInfo& inputEventInfo) {}
     virtual void OnResize(VkExtent2D newExtent) {}
+    virtual void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {}
 
 protected:
     bool InitCheck(const RenderInitInfo& initInfo)

@@ -18,6 +18,7 @@ glslc %SHADER_SRC_DIR%\draw_vrs_region.frag -o .\Spirv\draw_vrs_region.frag.spv
 glslc %SHADER_SRC_DIR%\draw_vrs_region.vert -o .\Spirv\draw_vrs_region.vert.spv
 
 glslc %SHADER_SRC_DIR%\draw_vrs_region.comp -o .\Spirv\draw_vrs_region.comp.spv
+glslc %SHADER_SRC_DIR%\smooth_shading_rate.comp -o .\Spirv\smooth_shading_rate.comp.spv
 
 glslc %SHADER_SRC_DIR%\blend_vrs_image.frag -o .\Spirv\blend_vrs_image.frag.spv
 

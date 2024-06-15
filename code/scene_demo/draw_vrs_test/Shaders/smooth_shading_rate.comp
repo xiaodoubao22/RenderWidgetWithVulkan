@@ -1,0 +1,41 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout (binding = 0, r8ui) uniform readonly uimage2D inputImage;
+layout (binding = 1, r8ui) uniform writeonly uimage2D outputImage;
+
+void main()
+{
+    uint center = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy)).r;
+    uint up = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(0, -1)).r;
+    uint down = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(0, 1)).r;
+    uint left = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(-1, 0)).r;
+    uint right = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(1, 0)).r;
+
+    uint centerRateX = center & uint(0x03);
+    uint centerRateY = center >> 2;
+
+    uvec4 shadingRateY = uvec4(up, down, left, right) & uvec4(0x03);
+    uint rateX = (shadingRateY.x + shadingRateY.y + shadingRateY.z + shadingRateY.w + centerRateX) / 5;
+    rateX = min(center, rateX);
+    
+    uvec4 shadingRateX = uvec4(up, down, left, right) >> uvec4(2);
+    uint rateY = (shadingRateX.x + shadingRateX.y + shadingRateX.z + shadingRateX.w + centerRateX) / 5;
+    rateY = min(center, rateY);
+
+    lowp uint shadingRate = rateY | (rateX << 2);
+
+    if (rateX == 0x00 && rateY == 0x02) {
+        shadingRate = 0x01;
+    } else if (rateY == 0x00 && rateX == 0x02) {
+        shadingRate = 0x04;
+    }
+    //imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), uvec4(shadingRate));
+
+
+    if (gl_GlobalInvocationID.x % 2 == 0 && gl_GlobalInvocationID.x % 2 == 0) {
+        imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy) / 2, uvec4(shadingRate));
+    }
+}

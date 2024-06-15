@@ -14,6 +14,7 @@
 
 #include "SceneDemoDefs.h"
 #include "BufferCreator.h"
+#include "AppDispatchTable.h"
 #include "Log.h"
 #undef LOG_TAG
 #define LOG_TAG "DrawVrsTest"
@@ -100,6 +101,15 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
         throw std::runtime_error("fiaile to begin recording command buffer!");
     }
 
+    ImageMemoryBarrierInfo imageBarrierInfo{};
+    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;
+    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+
     std::vector<VkClearValue> clearValuesMain = { { 0.1f, 0.1f, 0.1f, 1.0f }, consts::CLEAR_DEPTH_ONE_STENCIL_ZERO };
     VkRect2D renderArea = { {0, 0}, {mMainFbExtent.width, mMainFbExtent.height} };
     VkRenderPassBeginInfo renderPassInfoMain = vulkanInitializers::RenderPassBeginInfo(
@@ -111,6 +121,13 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
     VkViewport viewportMain = { 0.0f, 0.0f, mMainFbExtent.width, mMainFbExtent.height, 0.0f, 1.0f };
     vkCmdSetViewport(mCommandBuffer, 0, 1, &viewportMain);
     vkCmdSetScissor(mCommandBuffer, 0, 1, &renderArea);
+
+    std::vector<VkExtent2D> shadingRates = { { 1, 1 }, {2, 2}, {4, 4}, {2, 4} };
+    std::vector<VkFragmentShadingRateCombinerOpKHR> combinerOps = {
+        VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR,
+        VK_FRAGMENT_SHADING_RATE_COMBINER_OP_MAX_KHR,
+    };
+    AppDeviceDispatchTable::GetInstance().CmdSetFragmentShadingRateKHR(mCommandBuffer, &shadingRates[0], combinerOps.data());
 
     // 绑定顶点缓冲
     std::vector<VkBuffer> vertexBuffersMain = { mVertexBuffer };
@@ -144,6 +161,8 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
 
     // pbr with texture
     vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelinePbrTexture.pipeline);
+    AppDeviceDispatchTable::GetInstance().CmdSetFragmentShadingRateKHR(mCommandBuffer, &shadingRates[0], combinerOps.data());
+
 
     for (int i = 0; i < INSTANCE_NUM; i++) {
         vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -156,7 +175,6 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
     vkCmdEndRenderPass(mCommandBuffer);
 
     // compute pass
-    ImageMemoryBarrierInfo imageBarrierInfo{};
     imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -165,13 +183,13 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
     imageBarrierInfo.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     mDevice->AddCmdPipelineBarrier(mCommandBuffer, mMainFbColorImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
-    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;
     imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
     imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
     vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mVrsPipeline->GetPipeline().pipeline);
     vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -179,6 +197,13 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
         0, 1, &mDescriptorSetVrsComp,
         0, nullptr);
     vkCmdDispatch(mCommandBuffer, mMainFbExtent.width / 16, mMainFbExtent.height / 16, 1);
+
+    vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mVrsPipeline->GetPipelineSmoothVrs().pipeline);
+    vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+        mVrsPipeline->GetPipelineSmoothVrs().layout,
+        0, 1, &mDescriptorSetSmoothVrs,
+        0, nullptr);
+    vkCmdDispatch(mCommandBuffer, mMainFbExtent.width / 64, mMainFbExtent.height / 64, 1);
 
     // =============================================================================
 
@@ -193,8 +218,6 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
     // =============================================================================
 
     RecordPresentPass(mCommandBuffer, input);
-
-
 
     // 写入完成
     if (vkEndCommandBuffer(mCommandBuffer) != VK_SUCCESS) {
@@ -268,6 +291,69 @@ void DrawVrsTest::ProcessInputEvent(const InputEventInfo& inputEventInfo)
     mCamera->UpdateView();
 }
 
+void DrawVrsTest::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice)
+{
+    if (physicalDevice == nullptr) {
+        LOGE("RequestPhysicalDeviceFeatures device is null");
+        return;
+    }
+
+    // ******************request vrs feature*******************
+    // feature
+    VkPhysicalDeviceFragmentShadingRateFeaturesKHR physicalDeviceVrsFeatures{
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR
+    };
+    VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
+    physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    physicalDeviceFeatures2.pNext = &physicalDeviceVrsFeatures;
+    vkGetPhysicalDeviceFeatures2(physicalDevice->Get(), &physicalDeviceFeatures2);
+
+    LOGI("physicalDeviceVrsFeatures : %d %d %d",
+        physicalDeviceVrsFeatures.attachmentFragmentShadingRate,
+        physicalDeviceVrsFeatures.pipelineFragmentShadingRate,
+        physicalDeviceVrsFeatures.primitiveFragmentShadingRate);
+    if (!physicalDeviceVrsFeatures.attachmentFragmentShadingRate) {
+        LOGE("attachmentFragmentShadingRate not supported");
+        return;
+    }
+
+    // properties
+    VkPhysicalDeviceFragmentShadingRatePropertiesKHR physicalDeviceVrsProperties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_PROPERTIES_KHR
+    };
+    VkPhysicalDeviceProperties2 physicalDeviceProperties2{};
+    physicalDeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    physicalDeviceProperties2.pNext = &physicalDeviceVrsProperties;
+    vkGetPhysicalDeviceProperties2(physicalDevice->Get(), &physicalDeviceProperties2);
+    LOGI("physicalDeviceVRSProperties : (%d, %d) (%d, %d) %d",
+        physicalDeviceVrsProperties.minFragmentShadingRateAttachmentTexelSize.width,
+        physicalDeviceVrsProperties.minFragmentShadingRateAttachmentTexelSize.height,
+        physicalDeviceVrsProperties.maxFragmentShadingRateAttachmentTexelSize.width,
+        physicalDeviceVrsProperties.maxFragmentShadingRateAttachmentTexelSize.height,
+        physicalDeviceVrsProperties.maxFragmentSizeAspectRatio);
+
+    // availiable shading rate
+    AppInstanceDispatchTable& dispatchTable = AppInstanceDispatchTable::GetInstance();
+    uint32_t availiableShadingRateSize = 0;
+    std::vector<VkPhysicalDeviceFragmentShadingRateKHR> availiableShadingRate(0);
+    VkResult res = dispatchTable.GetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice->Get(), &availiableShadingRateSize, nullptr);
+    if (availiableShadingRateSize != 0 && res == VK_SUCCESS) {
+        availiableShadingRate.resize(availiableShadingRateSize, { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR });
+        dispatchTable.GetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice->Get(), &availiableShadingRateSize, availiableShadingRate.data());
+    }
+
+    for (VkPhysicalDeviceFragmentShadingRateKHR& shadingRate : availiableShadingRate) {
+        LOGI("%x (%d, %d)", shadingRate.sampleCounts,
+            shadingRate.fragmentSize.width, shadingRate.fragmentSize.height);
+    }
+
+    auto& shadingRateCreateInfo = physicalDevice->RequestExtensionsFeatures<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR);
+    shadingRateCreateInfo.pipelineFragmentShadingRate = true;
+    shadingRateCreateInfo.attachmentFragmentShadingRate = true;
+    shadingRateCreateInfo.primitiveFragmentShadingRate = false;
+}
+
 void DrawVrsTest::CreateRenderPasses()
 {
     // subpass
@@ -275,10 +361,15 @@ void DrawVrsTest::CreateRenderPasses()
         vulkanInitializers::AttachmentReference2(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkAttachmentReference2 depthAttachmentRef =
         vulkanInitializers::AttachmentReference2(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    VkAttachmentReference2 shadingRateAttachment =
+        vulkanInitializers::AttachmentReference2(2, VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR);
+    VkFragmentShadingRateAttachmentInfoKHR shadingRateAttachmentInfo =
+        vulkanInitializers::FragmentShadingRateAttachmentInfoKHR(&shadingRateAttachment, { 16, 16 });
 
     std::vector<VkSubpassDescription2> subpasses = {
         vulkanInitializers::SubpassDescription2(VK_PIPELINE_BIND_POINT_GRAPHICS, &colorAttachmentRef, &depthAttachmentRef),
     };
+    subpasses[0].pNext = &shadingRateAttachmentInfo;
 
     std::vector<VkSubpassDependency2> dependencys = { vulkanInitializers::SubpassDependency2(VK_SUBPASS_EXTERNAL, 0) };
     dependencys[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
@@ -286,7 +377,7 @@ void DrawVrsTest::CreateRenderPasses()
     dependencys[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependencys[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    std::vector<VkAttachmentDescription2> mAttachments2(2);
+    std::vector<VkAttachmentDescription2> mAttachments2(3);
     // 颜色附件
     mAttachments2[0] = vulkanInitializers::AttachmentDescription2(mMainFbColorFormat);
     vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[0],
@@ -299,6 +390,12 @@ void DrawVrsTest::CreateRenderPasses()
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
     vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[1],
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    // shading rate附件
+    mAttachments2[2] = vulkanInitializers::AttachmentDescription2(VK_FORMAT_R8_UINT);
+    vulkanInitializers::AttachmentDescription2SetOp(mAttachments2[2],
+        VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+    vulkanInitializers::AttachmentDescription2SetLayout(mAttachments2[2],
+        VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR, VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR);
 
     VkRenderPassCreateInfo2 renderPassInfo = vulkanInitializers::RenderPassCreateInfo2(mAttachments2, subpasses);
     vulkanInitializers::RenderPassCreateInfo2SetArray(renderPassInfo, dependencys);
@@ -366,7 +463,7 @@ void DrawVrsTest::CreateMainFramebuffer()
         throw std::runtime_error("failed to create mMainFbDepthImageView!");
     }
 
-    std::vector<VkImageView> attachments = { mMainFbColorImageView, mMainFbDepthImageView };
+    std::vector<VkImageView> attachments = { mMainFbColorImageView, mMainFbDepthImageView, mVrsPipeline->GetSmoothVrsImageView()};
     VkFramebufferCreateInfo framebufferInfo = vulkanInitializers::FramebufferCreateInfo(
         mMainPass, attachments, mMainFbExtent.width, mMainFbExtent.height);
     if (vkCreateFramebuffer(mDevice->Get(), &framebufferInfo, nullptr, &mMainFrameBuffer) != VK_SUCCESS) {
@@ -470,13 +567,14 @@ void DrawVrsTest::CreateDescriptorPool() {
     poolSizes.insert(poolSizes.end(), mPipelineDrawPbr.descriptorSizes.begin(), mPipelineDrawPbr.descriptorSizes.end());
     poolSizes.insert(poolSizes.end(), mPipelinePbrTexture.descriptorSizes.begin(), mPipelinePbrTexture.descriptorSizes.end());
     poolSizes.insert(poolSizes.end(), mVrsPipeline->GetPipeline().descriptorSizes.begin(), mVrsPipeline->GetPipeline().descriptorSizes.end());
+    poolSizes.insert(poolSizes.end(), mVrsPipeline->GetPipelineSmoothVrs().descriptorSizes.begin(), mVrsPipeline->GetPipelineSmoothVrs().descriptorSizes.end());
     poolSizes.insert(poolSizes.end(), mPipelineBlendVrsImage.descriptorSizes.begin(), mPipelineBlendVrsImage.descriptorSizes.end());
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = poolSizes.size();
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = 5;   // 池中最大能申请descriptorSet的个数
+    poolInfo.maxSets = 6;   // 池中最大能申请descriptorSet的个数
     poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     if (vkCreateDescriptorPool(mDevice->Get(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
@@ -579,6 +677,25 @@ void DrawVrsTest::CreateDescriptorSets() {
 
     vkUpdateDescriptorSets(mDevice->Get(), vrsDescriptorSetWrites.size(), vrsDescriptorSetWrites.data(), 0, nullptr);
 
+    // smooth vrs pass ----------------------------------------------------------------------------------------------------
+    allocInfo.descriptorSetCount = mVrsPipeline->GetPipelineSmoothVrs().descriptorSetLayouts.size();
+    allocInfo.pSetLayouts = mVrsPipeline->GetPipelineSmoothVrs().descriptorSetLayouts.data();
+    if (vkAllocateDescriptorSets(mDevice->Get(), &allocInfo, &mDescriptorSetSmoothVrs) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+    VkDescriptorImageInfo originVrsImageInfo = { mTexureSamplerNearst, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_GENERAL };
+    VkDescriptorImageInfo smoothVrsImageInfo = { mTexureSamplerNearst, mVrsPipeline->GetSmoothVrsImageView(), VK_IMAGE_LAYOUT_GENERAL };
+
+    std::vector<VkWriteDescriptorSet> smoothVrsDescriptorSetWrites = {
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetSmoothVrs,
+            0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &originVrsImageInfo),
+        vulkanInitializers::WriteDescriptorSet(mDescriptorSetSmoothVrs,
+            1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &smoothVrsImageInfo),
+    };
+
+    vkUpdateDescriptorSets(mDevice->Get(), smoothVrsDescriptorSetWrites.size(), smoothVrsDescriptorSetWrites.data(), 0, nullptr);
+
     // blend vrs pass --------------------------------------------------------------------------------------------------------
     allocInfo.descriptorSetCount = mPipelineBlendVrsImage.descriptorSetLayouts.size();
     allocInfo.pSetLayouts = mPipelineBlendVrsImage.descriptorSetLayouts.data();
@@ -588,7 +705,7 @@ void DrawVrsTest::CreateDescriptorSets() {
 
     // 向descriptor set写入信息
     VkDescriptorImageInfo sampleVrsBlendImageInfo = {
-        mTexureSamplerNearst, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        mTexureSamplerNearst, mVrsPipeline->GetSmoothVrsImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
     std::vector<VkWriteDescriptorSet> vrsBlendDescriptorWrites = {
         vulkanInitializers::WriteDescriptorSet(mDescriptorSetBlendVrs,
@@ -635,7 +752,7 @@ void DrawVrsTest::CreatePipelines()
     vrsBlendAttachmentStates[0] = vulkanInitializers::PipelineColorBlendAttachmentState();
     vrsBlendAttachmentStates[0].blendEnable = VK_TRUE;
     vrsBlendAttachmentStates[0].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    vrsBlendAttachmentStates[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    vrsBlendAttachmentStates[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
     vrsBlendAttachmentStates[0].colorBlendOp = VK_BLEND_OP_ADD;
     vrsBlendAttachmentStates[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     vrsBlendAttachmentStates[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -663,6 +780,7 @@ void DrawVrsTest::CreatePipelines()
     };
 
     GraphicsPipelineConfigInfo pipelinePbrConfigInfo{};
+    pipelinePbrConfigInfo.AddDynamicState(VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR);
     pipelinePbrConfigInfo.SetRenderPass(mMainPass);
     pipelinePbrConfigInfo.SetVertexInputBindings({ Vertex3D::GetBindingDescription() });
     pipelinePbrConfigInfo.SetVertexInputAttributes(Vertex3D::getAttributeDescriptions());
@@ -689,6 +807,7 @@ void DrawVrsTest::CreatePipelines()
     };
 
     GraphicsPipelineConfigInfo pbrTextureConfigInfo{};
+    pbrTextureConfigInfo.AddDynamicState(VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR);
     pbrTextureConfigInfo.SetRenderPass(mMainPass);
     pbrTextureConfigInfo.SetVertexInputBindings({ Vertex3D::GetBindingDescription() });
     pbrTextureConfigInfo.SetVertexInputAttributes(Vertex3D::getAttributeDescriptions());
@@ -921,14 +1040,14 @@ void DrawVrsTest::UpdateDescriptorSets()
 
 void DrawVrsTest::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input)
 {
-    ImageMemoryBarrierInfo imageBarrierInfo{};
-    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    //ImageMemoryBarrierInfo imageBarrierInfo{};
+    //imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    //imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    //imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    //imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    //imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    //mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
     // 启动Pass
     std::array<VkClearValue, 2> clearValues = {

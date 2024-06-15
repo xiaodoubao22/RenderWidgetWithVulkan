@@ -22,6 +22,7 @@ public:
     std::vector<VkCommandBuffer>& RecordCommand(const RenderInputInfo& input) override;
     void OnResize(VkExtent2D newExtent) override;
     void ProcessInputEvent(const InputEventInfo& inputEventInfo) override;
+    void RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) override;
 
 private:
     void CreateRenderPasses();
@@ -95,6 +96,7 @@ private:
     VkDescriptorSet mDescriptorSetPresent = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetVrsComp = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetBlendVrs = VK_NULL_HANDLE;
+    VkDescriptorSet mDescriptorSetSmoothVrs = VK_NULL_HANDLE;
 
     // test texture
     VmaAllocation RoughnessImageAllocation = VK_NULL_HANDLE;

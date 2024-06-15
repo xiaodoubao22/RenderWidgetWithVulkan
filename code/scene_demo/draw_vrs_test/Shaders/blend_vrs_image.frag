@@ -18,7 +18,7 @@ uint shadingRate4x4 = 0x0A;
 
 void main() {
 
-    uint shadingRate = texture(vrsImage, fragTexCoord).r;
+    uint shadingRate = texture(vrsImage, fragTexCoord * 0.5).r;
 
     vec3 color = vec3(0.0);
 

@@ -21,31 +21,44 @@ public:
         return mPipelineDrawVrsRegion;
     }
 
+    PipelineObjecs& GetPipelineSmoothVrs() {
+        return mPipelineSmoothVrs;
+    }
+
     VkImage& GetVrsImage() {
         return mVrsImage;
+    }
+
+    VkImage& GetSmoothVrsImage() {
+        return mSmoothVrsImage;
     }
 
     VkImageView& GetVrsImageView() {
         return mVrsImageView;
     }
 
-private:
-    void CreateRenderPass();
+    VkImageView& GetSmoothVrsImageView() {
+        return mSmoothVrsImageView;
+    }
 
+private:
     void CreatePipeline();
     void CleanUpPipeline();
 
 private:
     Device* mDevice = nullptr;
 
-    VkRenderPass mPassDrawVrsRegion = VK_NULL_HANDLE;
-
     PipelineObjecs mPipelineDrawVrsRegion = {};
+    PipelineObjecs mPipelineSmoothVrs = {};
 
     // vrs image
     VmaAllocation mVrsImageAllocation = VK_NULL_HANDLE;
     VkImage mVrsImage = VK_NULL_HANDLE;
     VkImageView mVrsImageView = VK_NULL_HANDLE;
+
+    VmaAllocation mSmoothVrsImageAllocation = VK_NULL_HANDLE;
+    VkImage mSmoothVrsImage = VK_NULL_HANDLE;
+    VkImageView mSmoothVrsImageView = VK_NULL_HANDLE;
 
 };
 

@@ -51,7 +51,7 @@ public:
     }
 
     DEFINE_FUNCTION(VkResult, GetPhysicalDeviceFragmentShadingRatesKHR, VkPhysicalDevice physicalDevice, uint32_t* pFragmentShadingRateCount, VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates)
-    LOAD_AND_DISPATCH_INSTANCE_FUNCTION(GetPhysicalDeviceFragmentShadingRatesKHR, VK_ERROR_DEVICE_LOST, physicalDevice, pFragmentShadingRateCount, pFragmentShadingRates)
+    LOAD_AND_DISPATCH_INSTANCE_FUNCTION(GetPhysicalDeviceFragmentShadingRatesKHR, VK_ERROR_INITIALIZATION_FAILED, physicalDevice, pFragmentShadingRateCount, pFragmentShadingRates)
 
 private:
     VkInstance mInstance = VK_NULL_HANDLE;

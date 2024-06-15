@@ -124,6 +124,7 @@ void RenderThread::OnThreadDestroy() {
 }
 
 void RenderThread::RequestPhysicalDeviceFeatures(PhysicalDevice* physicalDevice) {
+    mSceneRender->RequestPhysicalDeviceFeatures(physicalDevice);
     //auto& shadingRateCreateInfo = physicalDevice->RequestExtensionsFeatures<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(
     //    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR);
     //shadingRateCreateInfo.pipelineFragmentShadingRate = true;
