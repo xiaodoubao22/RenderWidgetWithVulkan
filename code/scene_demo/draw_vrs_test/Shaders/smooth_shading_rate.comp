@@ -6,36 +6,77 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout (binding = 0, r8ui) uniform readonly uimage2D inputImage;
 layout (binding = 1, r8ui) uniform writeonly uimage2D outputImage;
 
-void main()
+uvec2 SmoothShadingRate(in uint center, in uint up, in uint down, in uint left, in uint right)
 {
-    uint center = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy)).r;
-    uint up = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(0, -1)).r;
-    uint down = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(0, 1)).r;
-    uint left = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(-1, 0)).r;
-    uint right = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy) + ivec2(1, 0)).r;
-
     uint centerRateX = center & uint(0x03);
     uint centerRateY = center >> 2;
 
     uvec4 shadingRateY = uvec4(up, down, left, right) & uvec4(0x03);
     uint rateX = (shadingRateY.x + shadingRateY.y + shadingRateY.z + shadingRateY.w + centerRateX) / 5;
-    rateX = min(center, rateX);
     
     uvec4 shadingRateX = uvec4(up, down, left, right) >> uvec4(2);
     uint rateY = (shadingRateX.x + shadingRateX.y + shadingRateX.z + shadingRateX.w + centerRateX) / 5;
-    rateY = min(center, rateY);
 
-    lowp uint shadingRate = rateY | (rateX << 2);
-
-    if (rateX == 0x00 && rateY == 0x02) {
-        shadingRate = 0x01;
-    } else if (rateY == 0x00 && rateX == 0x02) {
-        shadingRate = 0x04;
-    }
-    //imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), uvec4(shadingRate));
-
-
-    if (gl_GlobalInvocationID.x % 2 == 0 && gl_GlobalInvocationID.x % 2 == 0) {
-        imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy) / 2, uvec4(shadingRate));
-    }
+    return uvec2(min(center, rateX), min(center, rateY));
 }
+
+uint CombineShadingRate(in uvec2 shadingRate)
+{
+    lowp uint shadingRateCode = shadingRate.y | (shadingRate.x << 2);
+    if (shadingRate.x == 0x00 && shadingRate.y == 0x02) {
+        shadingRateCode = 0x01;
+    } else if (shadingRate.y == 0x00 && shadingRate.x == 0x02) {
+        shadingRateCode = 0x04;
+    }
+    return shadingRateCode;
+}
+
+void main()
+{
+    uint originRateCenter[2][2];
+    uint originRateVertical[2][2];
+    uint originRateHorizontal[2][2];
+
+    ivec2 texCoordRef = ivec2(gl_GlobalInvocationID.xy) * 2;
+    originRateCenter[0][0] = imageLoad(inputImage, texCoordRef).r;
+    originRateCenter[1][0] = imageLoad(inputImage, texCoordRef + ivec2(1, 0)).r;
+    originRateCenter[0][1] = imageLoad(inputImage, texCoordRef + ivec2(0, 1)).r;
+    originRateCenter[1][1] = imageLoad(inputImage, texCoordRef + ivec2(1, 1)).r;
+
+    originRateVertical[0][0] = imageLoad(inputImage, texCoordRef + ivec2(0, -1)).r;
+    originRateVertical[1][0] = imageLoad(inputImage, texCoordRef + ivec2(1, -1)).r;
+    originRateVertical[0][1] = imageLoad(inputImage, texCoordRef + ivec2(0, 2)).r;
+    originRateVertical[1][1] = imageLoad(inputImage, texCoordRef + ivec2(1, 2)).r;
+
+    originRateHorizontal[0][0] = imageLoad(inputImage, texCoordRef + ivec2(-1, 0)).r;
+    originRateHorizontal[1][0] = imageLoad(inputImage, texCoordRef + ivec2(2, 0)).r;
+    originRateHorizontal[0][1] = imageLoad(inputImage, texCoordRef + ivec2(-1, 1)).r;
+    originRateHorizontal[1][1] = imageLoad(inputImage, texCoordRef + ivec2(2, 1)).r;
+
+    uvec2 shadingRate00 = SmoothShadingRate(originRateCenter[0][0],
+        originRateVertical[0][0], originRateCenter[0][1],
+        originRateHorizontal[0][0], originRateCenter[0][1]);
+    
+    uvec2 shadingRate10 = SmoothShadingRate(originRateCenter[1][0],
+        originRateVertical[1][0], originRateCenter[1][1],
+        originRateCenter[0][0], originRateHorizontal[1][0]);
+
+    uvec2 shadingRate01 = SmoothShadingRate(originRateCenter[0][1],
+        originRateCenter[0][0], originRateVertical[0][1],
+        originRateHorizontal[0][1], originRateCenter[1][1]);
+    
+    uvec2 shadingRate11 = SmoothShadingRate(originRateCenter[1][1],
+        originRateCenter[1][0], originRateVertical[1][1],
+        originRateCenter[0][1], originRateHorizontal[1][1]);
+
+    // for 8x8 tile
+    // imageStore(outputImage, texCoordRef, uvec4(CombineShadingRate(shadingRate00)));
+    // imageStore(outputImage, texCoordRef + ivec2(1, 0), uvec4(CombineShadingRate(shadingRate10)));
+    // imageStore(outputImage, texCoordRef + ivec2(0, 1), uvec4(CombineShadingRate(shadingRate01)));
+    // imageStore(outputImage, texCoordRef + ivec2(1, 1), uvec4(CombineShadingRate(shadingRate11)));
+
+    // for 16x16 tile
+    uvec2 avgShadingRate = (shadingRate00 + shadingRate10 + shadingRate01 + shadingRate11) / 4;
+    imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), uvec4(CombineShadingRate(avgShadingRate)));
+}
+

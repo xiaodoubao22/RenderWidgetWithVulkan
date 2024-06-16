@@ -28,6 +28,9 @@ private:
     void CreateRenderPasses();
     void CleanUpRenderPasses();
 
+    void CreateMainFbAttachment();
+    void CleanUpMainFbAttachment();
+
     void CreateMainFramebuffer();
     void CleanUpMainFramebuffer();
 
@@ -94,9 +97,7 @@ private:
     VkDescriptorSet mDescriptorSetPbr = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetPbrTexture = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetPresent = VK_NULL_HANDLE;
-    VkDescriptorSet mDescriptorSetVrsComp = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSetBlendVrs = VK_NULL_HANDLE;
-    VkDescriptorSet mDescriptorSetSmoothVrs = VK_NULL_HANDLE;
 
     // test texture
     VmaAllocation RoughnessImageAllocation = VK_NULL_HANDLE;

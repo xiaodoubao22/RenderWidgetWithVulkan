@@ -14,8 +14,11 @@ public:
     void Init(Device* device);
     void CleanUp();
 
-    void CreateVrsImage(uint32_t width, uint32_t height);
+    void CreateVrsImage(VkImage mainFbColorImage, VkImageView mainFbColorImageView, uint32_t mainFbWidth, uint32_t mainFbHeight);
     void CleanUpVrsImage();
+
+    void CmdPrepareShadingRate(VkCommandBuffer commandBuffer);
+    void CmdAnalysisContent(VkCommandBuffer commandBUffer);
 
     PipelineObjecs& GetPipeline() {
         return mPipelineDrawVrsRegion;
@@ -45,11 +48,26 @@ private:
     void CreatePipeline();
     void CleanUpPipeline();
 
+    void CreateDescriptorPool();
+    void CreateDesciptorSets();
+    void UpdateDescriptorSets(VkImageView mainFbColorAttachment, VkImageView vrsImageView, VkImageView smoothVrsImageView);
+
+    void CreateSampler();
+    void CleanUpSampler();
+
 private:
     Device* mDevice = nullptr;
+    VkImage mMainFbColorImage = VK_NULL_HANDLE;
+    VkImageView mMainFbColorImageView = VK_NULL_HANDLE;
+    uint32_t mMainFbWidth = 0;
+    uint32_t mMainFbHeight = 0;
 
     PipelineObjecs mPipelineDrawVrsRegion = {};
     PipelineObjecs mPipelineSmoothVrs = {};
+
+    VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
+    VkDescriptorSet mDescriptorSetVrsComp = VK_NULL_HANDLE;
+    VkDescriptorSet mDescriptorSetSmoothVrs = VK_NULL_HANDLE;
 
     // vrs image
     VmaAllocation mVrsImageAllocation = VK_NULL_HANDLE;
@@ -59,6 +77,11 @@ private:
     VmaAllocation mSmoothVrsImageAllocation = VK_NULL_HANDLE;
     VkImage mSmoothVrsImage = VK_NULL_HANDLE;
     VkImageView mSmoothVrsImageView = VK_NULL_HANDLE;
+
+    uint32_t mVrsImageWidth = 0;
+    uint32_t mVrsImageHeight = 0;
+
+    VkSampler mNearestSampler = VK_NULL_HANDLE;
 
 };
 

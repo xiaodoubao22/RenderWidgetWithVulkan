@@ -53,9 +53,9 @@ void DrawVrsTest::Init(const RenderInitInfo& initInfo)
     mMesh->GenerateSphere(1.0f, glm::vec3(0.0), glm::uvec2(64, 64));
 
     mVrsPipeline->Init(mDevice);
-    mVrsPipeline->CreateVrsImage(mMainFbExtent.width, mMainFbExtent.height);
 
     CreateRenderPasses();
+    CreateMainFbAttachment();
     CreateMainFramebuffer();
     CreatePipelines();
     mCommandBuffer = mDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
@@ -79,9 +79,9 @@ void DrawVrsTest::CleanUp()
     mDevice->FreeCommandBuffer(mCommandBuffer);
     CleanUpPipelines();
     CleanUpMainFramebuffer();
+    CleanUpMainFbAttachment();
     CleanUpRenderPasses();
 
-    mVrsPipeline->CleanUpVrsImage();
     mVrsPipeline->CleanUp();
 }
 
@@ -101,14 +101,7 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
         throw std::runtime_error("fiaile to begin recording command buffer!");
     }
 
-    ImageMemoryBarrierInfo imageBarrierInfo{};
-    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;
-    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    mVrsPipeline->CmdPrepareShadingRate(mCommandBuffer);
 
     std::vector<VkClearValue> clearValuesMain = { { 0.1f, 0.1f, 0.1f, 1.0f }, consts::CLEAR_DEPTH_ONE_STENCIL_ZERO };
     VkRect2D renderArea = { {0, 0}, {mMainFbExtent.width, mMainFbExtent.height} };
@@ -174,39 +167,11 @@ std::vector<VkCommandBuffer>& DrawVrsTest::RecordCommand(const RenderInputInfo& 
 
     vkCmdEndRenderPass(mCommandBuffer);
 
-    // compute pass
-    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    imageBarrierInfo.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mMainFbColorImage, VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
-
-    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR;
-    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
-
-    vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mVrsPipeline->GetPipeline().pipeline);
-    vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-        mVrsPipeline->GetPipeline().layout,
-        0, 1, &mDescriptorSetVrsComp,
-        0, nullptr);
-    vkCmdDispatch(mCommandBuffer, mMainFbExtent.width / 16, mMainFbExtent.height / 16, 1);
-
-    vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mVrsPipeline->GetPipelineSmoothVrs().pipeline);
-    vkCmdBindDescriptorSets(mCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-        mVrsPipeline->GetPipelineSmoothVrs().layout,
-        0, 1, &mDescriptorSetSmoothVrs,
-        0, nullptr);
-    vkCmdDispatch(mCommandBuffer, mMainFbExtent.width / 64, mMainFbExtent.height / 64, 1);
+    mVrsPipeline->CmdAnalysisContent(mCommandBuffer);
 
     // =============================================================================
 
+    ImageMemoryBarrierInfo imageBarrierInfo{};
     imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
@@ -238,12 +203,11 @@ void DrawVrsTest::OnResize(VkExtent2D newExtent)
     mMainFbExtent.width *= mResolutionFactor;
     mMainFbExtent.height *= mResolutionFactor;
 
-    mVrsPipeline->CleanUpVrsImage();
-
     CleanUpMainFramebuffer();
-    CreateMainFramebuffer();
+    CleanUpMainFbAttachment();
 
-    mVrsPipeline->CreateVrsImage(mMainFbExtent.width, mMainFbExtent.height);
+    CreateMainFbAttachment();
+    CreateMainFramebuffer();
 
     UpdateDescriptorSets();
 }
@@ -409,7 +373,7 @@ void DrawVrsTest::CleanUpRenderPasses()
     vkDestroyRenderPass(mDevice->Get(), mMainPass, nullptr);
 }
 
-void DrawVrsTest::CreateMainFramebuffer()
+void DrawVrsTest::CreateMainFbAttachment()
 {
     // create images
     VkImageCreateInfo colorImageInfo = vulkanInitializers::ImageCreateInfo(
@@ -463,6 +427,23 @@ void DrawVrsTest::CreateMainFramebuffer()
         throw std::runtime_error("failed to create mMainFbDepthImageView!");
     }
 
+    mVrsPipeline->CreateVrsImage(mMainFbColorImage, mMainFbColorImageView, mMainFbExtent.width, mMainFbExtent.height);
+}
+
+void DrawVrsTest::CleanUpMainFbAttachment()
+{
+    mVrsPipeline->CleanUpVrsImage();
+
+    vkDestroyImageView(mDevice->Get(), mMainFbDepthImageView, nullptr);
+    vkDestroyImageView(mDevice->Get(), mMainFbColorImageView, nullptr);
+    vkDestroyImage(mDevice->Get(), mMainFbDepthImage, nullptr);
+    vkDestroyImage(mDevice->Get(), mMainFbColorImage, nullptr);
+    vkFreeMemory(mDevice->Get(), mMainFbMemory, nullptr);
+}
+
+void DrawVrsTest::CreateMainFramebuffer()
+{
+
     std::vector<VkImageView> attachments = { mMainFbColorImageView, mMainFbDepthImageView, mVrsPipeline->GetSmoothVrsImageView()};
     VkFramebufferCreateInfo framebufferInfo = vulkanInitializers::FramebufferCreateInfo(
         mMainPass, attachments, mMainFbExtent.width, mMainFbExtent.height);
@@ -477,11 +458,6 @@ void DrawVrsTest::CleanUpMainFramebuffer()
 {
     LOGI("clean up main fb %d", mMainFrameBuffer);
     vkDestroyFramebuffer(mDevice->Get(), mMainFrameBuffer, nullptr);
-    vkDestroyImageView(mDevice->Get(), mMainFbDepthImageView, nullptr);
-    vkDestroyImageView(mDevice->Get(), mMainFbColorImageView, nullptr);
-    vkDestroyImage(mDevice->Get(), mMainFbDepthImage, nullptr);
-    vkDestroyImage(mDevice->Get(), mMainFbColorImage, nullptr);
-    vkFreeMemory(mDevice->Get(), mMainFbMemory, nullptr);
 }
 
 void DrawVrsTest::CreateVertexBuffer() {
@@ -566,15 +542,13 @@ void DrawVrsTest::CreateDescriptorPool() {
     poolSizes.insert(poolSizes.end(), mPipelinePresent.descriptorSizes.begin(), mPipelinePresent.descriptorSizes.end());
     poolSizes.insert(poolSizes.end(), mPipelineDrawPbr.descriptorSizes.begin(), mPipelineDrawPbr.descriptorSizes.end());
     poolSizes.insert(poolSizes.end(), mPipelinePbrTexture.descriptorSizes.begin(), mPipelinePbrTexture.descriptorSizes.end());
-    poolSizes.insert(poolSizes.end(), mVrsPipeline->GetPipeline().descriptorSizes.begin(), mVrsPipeline->GetPipeline().descriptorSizes.end());
-    poolSizes.insert(poolSizes.end(), mVrsPipeline->GetPipelineSmoothVrs().descriptorSizes.begin(), mVrsPipeline->GetPipelineSmoothVrs().descriptorSizes.end());
     poolSizes.insert(poolSizes.end(), mPipelineBlendVrsImage.descriptorSizes.begin(), mPipelineBlendVrsImage.descriptorSizes.end());
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = poolSizes.size();
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = 6;   // 池中最大能申请descriptorSet的个数
+    poolInfo.maxSets = 4;   // 池中最大能申请descriptorSet的个数
     poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     if (vkCreateDescriptorPool(mDevice->Get(), &poolInfo, nullptr, &mDescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
@@ -658,44 +632,6 @@ void DrawVrsTest::CreateDescriptorSets() {
 
     vkUpdateDescriptorSets(mDevice->Get(), pbrTextureWrites.size(), pbrTextureWrites.data(), 0, nullptr);
 
-    // vrs compute pass --------------------------------------------------------------------------------------------------------
-    allocInfo.descriptorSetCount = mVrsPipeline->GetPipeline().descriptorSetLayouts.size();
-    allocInfo.pSetLayouts = mVrsPipeline->GetPipeline().descriptorSetLayouts.data();
-    if (vkAllocateDescriptorSets(mDevice->Get(), &allocInfo, &mDescriptorSetVrsComp) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
-    VkDescriptorImageInfo texInputImageInfo = { mTexureSampler, mMainFbColorImageView, VK_IMAGE_LAYOUT_GENERAL };
-    VkDescriptorImageInfo texVrsImageInfo = { mTexureSampler, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_GENERAL };
-
-    std::vector<VkWriteDescriptorSet> vrsDescriptorSetWrites = {
-        vulkanInitializers::WriteDescriptorSet(mDescriptorSetVrsComp,
-            0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &texInputImageInfo),
-        vulkanInitializers::WriteDescriptorSet(mDescriptorSetVrsComp,
-            1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &texVrsImageInfo),
-    };
-
-    vkUpdateDescriptorSets(mDevice->Get(), vrsDescriptorSetWrites.size(), vrsDescriptorSetWrites.data(), 0, nullptr);
-
-    // smooth vrs pass ----------------------------------------------------------------------------------------------------
-    allocInfo.descriptorSetCount = mVrsPipeline->GetPipelineSmoothVrs().descriptorSetLayouts.size();
-    allocInfo.pSetLayouts = mVrsPipeline->GetPipelineSmoothVrs().descriptorSetLayouts.data();
-    if (vkAllocateDescriptorSets(mDevice->Get(), &allocInfo, &mDescriptorSetSmoothVrs) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
-    VkDescriptorImageInfo originVrsImageInfo = { mTexureSamplerNearst, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_GENERAL };
-    VkDescriptorImageInfo smoothVrsImageInfo = { mTexureSamplerNearst, mVrsPipeline->GetSmoothVrsImageView(), VK_IMAGE_LAYOUT_GENERAL };
-
-    std::vector<VkWriteDescriptorSet> smoothVrsDescriptorSetWrites = {
-        vulkanInitializers::WriteDescriptorSet(mDescriptorSetSmoothVrs,
-            0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &originVrsImageInfo),
-        vulkanInitializers::WriteDescriptorSet(mDescriptorSetSmoothVrs,
-            1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &smoothVrsImageInfo),
-    };
-
-    vkUpdateDescriptorSets(mDevice->Get(), smoothVrsDescriptorSetWrites.size(), smoothVrsDescriptorSetWrites.data(), 0, nullptr);
-
     // blend vrs pass --------------------------------------------------------------------------------------------------------
     allocInfo.descriptorSetCount = mPipelineBlendVrsImage.descriptorSetLayouts.size();
     allocInfo.pSetLayouts = mPipelineBlendVrsImage.descriptorSetLayouts.data();
@@ -712,7 +648,6 @@ void DrawVrsTest::CreateDescriptorSets() {
             0, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &sampleVrsBlendImageInfo),
     };
     vkUpdateDescriptorSets(mDevice->Get(), vrsBlendDescriptorWrites.size(), vrsBlendDescriptorWrites.data(), 0, nullptr);
-
 }
 
 void DrawVrsTest::CreatePipelines()
@@ -1016,20 +951,9 @@ void DrawVrsTest::UpdateDescriptorSets()
         0, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &sampleMainFbColorImageInfo);
     vkUpdateDescriptorSets(mDevice->Get(), presentDescriptorWrites.size(), presentDescriptorWrites.data(), 0, nullptr);
 
-    // compute vrs pass
-    VkDescriptorImageInfo texInputImageInfo = { mTexureSampler, mMainFbColorImageView, VK_IMAGE_LAYOUT_GENERAL };
-    VkDescriptorImageInfo texVrsImageInfo = { mTexureSampler, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_GENERAL };
-    std::vector<VkWriteDescriptorSet> vrsDescriptorSetWrites = {
-        vulkanInitializers::WriteDescriptorSet(mDescriptorSetVrsComp,
-            0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &texInputImageInfo),
-        vulkanInitializers::WriteDescriptorSet(mDescriptorSetVrsComp,
-            1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &texVrsImageInfo),
-    };
-    vkUpdateDescriptorSets(mDevice->Get(), vrsDescriptorSetWrites.size(), vrsDescriptorSetWrites.data(), 0, nullptr);
-
     // blend vrs pass
     VkDescriptorImageInfo sampleVrsBlendImageInfo = {
-        mTexureSamplerNearst, mVrsPipeline->GetVrsImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        mTexureSamplerNearst, mVrsPipeline->GetSmoothVrsImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
     std::vector<VkWriteDescriptorSet> vrsBlendDescriptorWrites = {
         vulkanInitializers::WriteDescriptorSet(mDescriptorSetBlendVrs,
@@ -1040,14 +964,14 @@ void DrawVrsTest::UpdateDescriptorSets()
 
 void DrawVrsTest::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input)
 {
-    //ImageMemoryBarrierInfo imageBarrierInfo{};
-    //imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    //imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    //imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    //imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    //imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    //imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    //mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    ImageMemoryBarrierInfo imageBarrierInfo{};
+    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 
     // 启动Pass
     std::array<VkClearValue, 2> clearValues = {
@@ -1092,5 +1016,13 @@ void DrawVrsTest::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInf
 
     // 结束Pass
     vkCmdEndRenderPass(cmdBuf);
+
+    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
 }
 }   // namespace render

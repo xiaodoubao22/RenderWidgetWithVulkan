@@ -8,7 +8,7 @@ layout (binding = 1, r8ui) uniform writeonly uimage2D outputImage;
 
 shared highp uint groupAvgDxDy[4];
 
-const float g_sensitivity = 5e-4;
+const float g_sensitivity = 5e-3;
 const float g_quarterCoef = 2.13;
 
 uint GetTileIndex()
