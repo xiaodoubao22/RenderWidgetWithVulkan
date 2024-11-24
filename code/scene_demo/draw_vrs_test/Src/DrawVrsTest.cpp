@@ -772,10 +772,15 @@ void DrawVrsTest::CreateTextures()
     BufferCreator& bufferCreator = BufferCreator::GetInstance();
 
     std::vector<std::string> texturePaths = {
-        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_roughness.png",
-        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_metallic.png",
-        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_basecolor.png",
-        "../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_normal.png",
+        //"../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_roughness.png",
+        //"../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_metallic.png",
+        //"../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_basecolor.png",
+        //"../resource/pbr_textures/rustediron1-alt2-Unreal-Engine/rustediron2_normal.png",
+
+        "../resource/pbr_textures/gold-scuffed-Unreal-Engine/gold-scuffed_roughness.png",
+        "../resource/pbr_textures/gold-scuffed-Unreal-Engine/gold-scuffed_metallic.png",
+        "../resource/pbr_textures/gold-scuffed-Unreal-Engine/gold-scuffed_basecolor-boosted.png",
+        "../resource/pbr_textures/gold-scuffed-Unreal-Engine/gold-scuffed_normal.png",
     };
 
     std::vector<StbImageBuffer> imageBuffers(texturePaths.size());
@@ -964,14 +969,16 @@ void DrawVrsTest::UpdateDescriptorSets()
 
 void DrawVrsTest::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInfo& input)
 {
-    ImageMemoryBarrierInfo imageBarrierInfo{};
-    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    if (mBlendKeyPress) {
+        ImageMemoryBarrierInfo imageBarrierInfo{};
+        imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    }
 
     // 启动Pass
     std::array<VkClearValue, 2> clearValues = {
@@ -1017,12 +1024,15 @@ void DrawVrsTest::RecordPresentPass(VkCommandBuffer cmdBuf, const RenderInputInf
     // 结束Pass
     vkCmdEndRenderPass(cmdBuf);
 
-    imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    if (mBlendKeyPress) {
+        ImageMemoryBarrierInfo imageBarrierInfo{};
+        imageBarrierInfo.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageBarrierInfo.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imageBarrierInfo.srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        imageBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        imageBarrierInfo.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        mDevice->AddCmdPipelineBarrier(mCommandBuffer, mVrsPipeline->GetSmoothVrsImage(), VK_IMAGE_ASPECT_COLOR_BIT, imageBarrierInfo);
+    }
 }
 }   // namespace render

@@ -735,6 +735,13 @@ void DrawScenePbr::UpdataUniformBuffer(float aspectRatio)
     uboMvpMatrixs.proj = mCamera->GetProjection();
     uboMvpMatrixs.proj[1][1] *= -1;
 
+    glm::mat vpMat = uboMvpMatrixs.proj * uboMvpMatrixs.view;
+
+    mLastFront = mFront;
+    mFront = glm::vec3(vpMat[0][3], vpMat[1][3], vpMat[2][3]);
+    
+    float cos = glm::dot(mFront, mLastFront);
+
     memcpy(mUboMvpMapped, &uboMvpMatrixs, sizeof(uboMvpMatrixs));
 
     UniformMaterial uboMaterial{};

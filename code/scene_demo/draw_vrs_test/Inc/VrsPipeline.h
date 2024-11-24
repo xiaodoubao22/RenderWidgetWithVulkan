@@ -3,6 +3,8 @@
 
 #include "FrameworkHeaders.h"
 #include "VmaUsage.h"
+#include "DescriptorSetManager.h"
+#include <memory>
 
 namespace framework {
 
@@ -82,6 +84,8 @@ private:
     uint32_t mVrsImageHeight = 0;
 
     VkSampler mNearestSampler = VK_NULL_HANDLE;
+
+    std::shared_ptr<DescriptorSetManager> m_dsManager = nullptr;
 
 };
 

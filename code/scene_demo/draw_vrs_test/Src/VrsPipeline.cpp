@@ -9,12 +9,28 @@
 
 namespace framework {
 
+const static std::vector<DescriptorSetManager::DSEntry> VRS_ENTRIES= {
+    {
+        .updateType = DescriptorSetManager::TYPE_FIXED,
+        .binding = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+    },
+    {
+        .updateType = DescriptorSetManager::TYPE_FIXED,
+        .binding = 2,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+    },
+};
+
 VrsPipeline::VrsPipeline()
 {
-
+    m_dsManager = std::make_shared<DescriptorSetManager>();
 }
 VrsPipeline::~VrsPipeline()
 {
+    m_dsManager = nullptr;
 }
 
 void VrsPipeline::Init(Device* device)
@@ -24,6 +40,13 @@ void VrsPipeline::Init(Device* device)
     CreateSampler();
     CreateDescriptorPool();
     CreateDesciptorSets();
+
+    DescriptorSetManager::InitInfo dsManagerInit = {
+        .device = mDevice->Get(),
+        .pEntries = VRS_ENTRIES.data(),
+        .entriesSize = static_cast<uint32_t>(VRS_ENTRIES.size()),
+    };
+    m_dsManager->Init(&dsManagerInit);
 }
 
 void VrsPipeline::CleanUp()

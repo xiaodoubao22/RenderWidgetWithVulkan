@@ -163,6 +163,10 @@ private:
         { FRAMEWORK_KEY_E, false },
     };
 
+
+    glm::vec3 mFront;
+    glm::vec3 mLastFront;
+
 };
 }
 

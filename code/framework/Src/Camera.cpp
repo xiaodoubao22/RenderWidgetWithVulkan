@@ -1,4 +1,5 @@
 #include "Camera.h"
+#include "Log.h"
 
 namespace framework {
 Camera::Camera() {
@@ -45,6 +46,7 @@ void Camera::UpdateView() {
     mFront.y = std::cos(glm::radians(mPitch)) * std::sin(glm::radians(mYaw));
     mFront.z = std::sin(glm::radians(mPitch));
     mFront = -glm::normalize(mFront);
+    //LOGI("front %.3f %.3f %.3f", mFront.x, mFront.y, mFront.z);
 
     mRight = glm::normalize(glm::cross(mFront, mWorldUp));
     mUp = glm::normalize(glm::cross(mRight, mFront));
